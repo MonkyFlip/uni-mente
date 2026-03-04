@@ -1,35 +1,45 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { ApolloProvider } from '@apollo/client';
+import { client } from './apollo/client';
+import { AuthProvider } from './auth/AuthContext';
+import { ThemeProvider } from './auth/ThemeContext';
+import { ProtectedRoute } from './auth/ProtectedRoute';
 
-function App() {
-  const [count, setCount] = useState(0)
+import Login              from './pages/Login';
+import Registro           from './pages/Registro';
+import Dashboard          from './pages/Dashboard';
+import Psicologos         from './pages/estudiante/Psicologos';
+import MisCitas           from './pages/estudiante/MisCitas';
+import Agenda             from './pages/psicologo/Agenda';
+import Horarios           from './pages/psicologo/Horarios';
+import RegistrarPsicologo from './pages/admin/RegistrarPsicologo';
 
+export default function App() {
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
-}
+    <ApolloProvider client={client}>
+      <ThemeProvider>
+        <AuthProvider>
+          <BrowserRouter>
+            <Routes>
+              <Route path="/login"   element={<Login />} />
+              <Route path="/registro" element={<Registro />} />
+              <Route path="/"        element={<Navigate to="/login" replace />} />
 
-export default App
+              <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+              <Route path="/psicologos" element={<ProtectedRoute><Psicologos /></ProtectedRoute>} />
+
+              <Route path="/mis-citas" element={<ProtectedRoute roles={['estudiante']}><MisCitas /></ProtectedRoute>} />
+
+              <Route path="/agenda"   element={<ProtectedRoute roles={['psicologo']}><Agenda /></ProtectedRoute>} />
+              <Route path="/horarios" element={<ProtectedRoute roles={['psicologo']}><Horarios /></ProtectedRoute>} />
+
+              <Route path="/registrar-psicologo" element={<ProtectedRoute roles={['administrador']}><RegistrarPsicologo /></ProtectedRoute>} />
+
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Routes>
+          </BrowserRouter>
+        </AuthProvider>
+      </ThemeProvider>
+    </ApolloProvider>
+  );
+}

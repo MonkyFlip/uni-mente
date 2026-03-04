@@ -1,0 +1,82 @@
+.tip {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--teal-glow);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: var(--radius);
+  padding: 14px 18px;
+  font-size: 14px; color: var(--cream);
+  margin-bottom: 28px;
+  animation: fadeUp 0.4s ease 0.1s both;
+}
+.tipIcon { color: var(--teal); flex-shrink: 0; transition: color var(--transition); }
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 32px;
+}
+.statsGrid > * { animation: fadeUp 0.4s ease both; }
+
+.sectionTitle {
+  font-family: 'Playfair Display', serif;
+  font-size: 20px; color: var(--white);
+  margin-bottom: 16px;
+  animation: fadeUp 0.35s ease 0.15s both;
+}
+
+.actionsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+.actionsGrid > * { animation: fadeUp 0.4s ease both; }
+
+.actionCard {
+  display: flex; align-items: center; gap: 16px;
+  background: var(--navy-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  text-decoration: none;
+  transition: all var(--transition);
+  cursor: pointer;
+  position: relative; overflow: hidden;
+}
+.actionCard::before {
+  content: '';
+  position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  background: var(--teal);
+  transform: scaleY(0);
+  transform-origin: bottom;
+  transition: transform var(--transition);
+}
+.actionCard:hover {
+  border-color: rgba(255,255,255,0.12);
+  background: var(--navy-hover);
+  transform: translateY(-3px);
+  box-shadow: 0 12px 32px rgba(0,0,0,0.25);
+}
+.actionCard:hover::before { transform: scaleY(1); }
+
+.actionIcon {
+  width: 52px; height: 52px; flex-shrink: 0;
+  background: var(--teal-glow);
+  border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--teal);
+  transition: background var(--transition), transform var(--transition);
+}
+.actionCard:hover .actionIcon { transform: scale(1.08); }
+.actionText { flex: 1; min-width: 0; }
+.actionTitle { font-size: 15px; font-weight: 600; color: var(--white); margin-bottom: 3px; }
+.actionDesc  { font-size: 12px; color: var(--cream-dim); line-height: 1.4; }
+.actionArrow {
+  color: var(--teal); flex-shrink: 0;
+  transform: translateX(-4px);
+  opacity: 0;
+  transition: all var(--transition);
+}
+.actionCard:hover .actionArrow { transform: translateX(0); opacity: 1; }
+
+@keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:none} }

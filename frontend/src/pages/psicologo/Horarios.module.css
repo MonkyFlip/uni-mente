@@ -1,0 +1,33 @@
+.layout { display: grid; grid-template-columns: 320px 1fr; gap: 24px; align-items: start; }
+
+.formCard {}
+.formTitle { font-family: 'Playfair Display', serif; font-size: 18px; color: var(--white); margin-bottom: 18px; }
+.form { display: flex; flex-direction: column; gap: 14px; }
+
+.horariosList {}
+.listTitle { font-family: 'Playfair Display', serif; font-size: 20px; color: var(--white); margin-bottom: 16px; }
+
+.grid { display: flex; flex-direction: column; gap: 16px; }
+.diaGroup {}
+.diaLabel {
+  font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.1em; color: var(--cream-dim); margin-bottom: 6px;
+}
+
+.horarioChip {
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--navy-card); border: 1px solid var(--border);
+  border-radius: 8px; padding: 10px 14px;
+  font-size: 14px; color: var(--cream);
+  margin-bottom: 6px;
+}
+.deleteBtn {
+  background: none; border: none; color: var(--cream-dim);
+  cursor: pointer; font-size: 12px; padding: 2px 6px; border-radius: 4px;
+  transition: all 0.15s;
+}
+.deleteBtn:hover { color: var(--red); background: rgba(224,92,92,0.1); }
+
+@media (max-width: 768px) {
+  .layout { grid-template-columns: 1fr; }
+}

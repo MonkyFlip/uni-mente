@@ -1,0 +1,154 @@
+/* ── Button ── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: 7px; font-weight: 500; border-radius: 8px;
+  transition: all var(--transition); cursor: pointer; border: none;
+  white-space: nowrap; position: relative; overflow: hidden;
+}
+.btn::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: rgba(255,255,255,0);
+  transition: background 0.15s;
+}
+.btn:hover::after { background: rgba(255,255,255,0.06); }
+.btn:active { transform: scale(0.97) !important; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.btn_primary  { background: var(--teal); color: var(--navy); }
+.btn_primary:hover:not(:disabled)  { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,0,0,0.25); }
+.btn_secondary { background: var(--navy-card); color: var(--cream); border: 1px solid var(--border); }
+.btn_secondary:hover:not(:disabled) { background: var(--navy-hover); border-color: var(--teal); }
+.btn_danger   { background: rgba(248,113,113,0.12); color: #f87171; border: 1px solid rgba(248,113,113,0.2); }
+.btn_danger:hover:not(:disabled) { background: rgba(248,113,113,0.22); }
+.btn_ghost    { background: transparent; color: var(--cream-dim); }
+.btn_ghost:hover:not(:disabled) { color: var(--cream); background: var(--navy-card); }
+
+.btn_sm  { padding: 6px 13px; font-size: 12px; border-radius: 6px; }
+.btn_md  { padding: 10px 20px; font-size: 14px; }
+.btn_lg  { padding: 12px 28px; font-size: 15px; }
+
+.btnIcon { display: flex; align-items: center; }
+
+/* ── Spinner ── */
+.spinIcon { animation: spin 0.75s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Card ── */
+.card {
+  background: var(--navy-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  transition: background var(--transition), border-color var(--transition), transform var(--transition), box-shadow var(--transition);
+}
+.cardHoverable:hover {
+  border-color: rgba(255,255,255,0.12);
+  transform: translateY(-3px);
+  box-shadow: 0 16px 40px rgba(0,0,0,0.3);
+}
+
+/* ── Page Header ── */
+.pageHeader {
+  display: flex; align-items: flex-start;
+  justify-content: space-between; gap: 16px;
+  margin-bottom: 32px;
+  animation: fadeUp 0.35s ease both;
+}
+.pageTitle {
+  font-size: 28px; font-weight: 700; color: var(--white); line-height: 1.2;
+}
+.pageSubtitle { font-size: 14px; color: var(--cream-dim); margin-top: 6px; }
+
+/* ── Badge ── */
+.badge {
+  display: inline-flex; align-items: center;
+  font-size: 11px; font-weight: 600;
+  padding: 3px 10px; border-radius: 99px;
+  text-transform: capitalize;
+  transition: all var(--transition);
+}
+.badge_teal   { background: rgba(0,0,0,0.2); color: var(--teal); border: 1px solid var(--teal-glow); }
+.badge_yellow { background: rgba(240,180,41,0.12); color: #fbbf24; border: 1px solid rgba(240,180,41,0.2); }
+.badge_green  { background: rgba(62,207,142,0.12); color: #3ecf8e; border: 1px solid rgba(62,207,142,0.2); }
+.badge_red    { background: rgba(248,113,113,0.12); color: #f87171; border: 1px solid rgba(248,113,113,0.2); }
+.badge_gray   { background: rgba(255,255,255,0.06); color: var(--cream-dim); border: 1px solid var(--border); }
+
+/* ── Empty State ── */
+.empty { text-align: center; padding: 64px 24px; animation: fadeUp 0.4s ease; }
+.emptyIcon {
+  width: 72px; height: 72px; margin: 0 auto 18px;
+  background: var(--navy-card); border: 1px solid var(--border);
+  border-radius: 20px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--cream-dim);
+}
+.emptyTitle { font-family: 'Playfair Display', serif; font-size: 20px; color: var(--cream); margin-bottom: 8px; }
+.emptyDesc  { font-size: 14px; color: var(--cream-dim); line-height: 1.6; }
+
+/* ── Field ── */
+.field { display: flex; flex-direction: column; gap: 6px; }
+.label { font-size: 12.5px; font-weight: 500; color: var(--cream-dim); letter-spacing: 0.01em; }
+.fieldError { font-size: 12px; color: #f87171; }
+
+/* ── Alert ── */
+.alert {
+  padding: 11px 14px; border-radius: 8px;
+  font-size: 13px; display: flex; align-items: center; gap: 8px;
+  animation: fadeUp 0.25s ease;
+}
+.alert_error   { background: rgba(248,113,113,0.1); color: #f87171; border: 1px solid rgba(248,113,113,0.2); }
+.alert_success { background: rgba(62,207,142,0.1); color: #3ecf8e; border: 1px solid rgba(62,207,142,0.2); }
+
+/* ── Modal ── */
+.overlay {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(0,0,0,0.65); backdrop-filter: blur(6px);
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+  animation: fadeIn 0.2s ease;
+}
+.modal {
+  background: var(--navy-card); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); width: 100%; max-width: 520px;
+  max-height: 90vh; overflow-y: auto;
+  animation: scaleIn 0.25s cubic-bezier(0.34,1.56,0.64,1);
+  box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+}
+.modalHeader {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20px 24px; border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; background: var(--navy-card); z-index: 1;
+}
+.modalTitle { font-family: 'Playfair Display', serif; font-size: 20px; color: var(--white); }
+.modalClose {
+  background: none; border: none; color: var(--cream-dim);
+  cursor: pointer; padding: 6px; border-radius: 6px;
+  display: flex; align-items: center;
+  transition: all var(--transition);
+}
+.modalClose:hover { color: var(--cream); background: var(--navy-hover); }
+.modalBody { padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+
+/* ── Stat Card ── */
+.statCard {
+  background: var(--navy-card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 20px;
+  display: flex; align-items: center; gap: 16px;
+  transition: all var(--transition);
+  animation: fadeUp 0.35s ease both;
+}
+.statCard:hover { transform: translateY(-2px); border-color: rgba(255,255,255,0.12); }
+.statIcon {
+  width: 50px; height: 50px; border-radius: 14px;
+  background: var(--teal-glow);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--teal); flex-shrink: 0;
+  transition: background var(--transition), color var(--transition);
+}
+.statValue { font-size: 28px; font-weight: 700; color: var(--white); font-family: 'Playfair Display', serif; }
+.statLabel { font-size: 12px; color: var(--cream-dim); margin-top: 2px; }
+
+/* ── Keyframes ── */
+@keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:none} }
+@keyframes fadeIn { from{opacity:0} to{opacity:1} }
+@keyframes scaleIn { from{opacity:0;transform:scale(0.93) translateY(8px)} to{opacity:1;transform:none} }

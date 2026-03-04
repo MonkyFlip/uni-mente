@@ -1,152 +1,167 @@
----
+# 🧠 UniMente
 
-# UniMente — Monorepo (Frontend + Backend)
-
-Este repositorio contiene el **frontend** y el **backend** del proyecto **UniMente**, organizados en un **monorepo** para facilitar el desarrollo, la sincronización de cambios y la entrega académica.
-
-La arquitectura está dividida en dos aplicaciones independientes:
-
-- **Frontend**: React + TypeScript + Vite  
-- **Backend**: NestJS + GraphQL + TypeScript  
-
-Ambas viven en un mismo repositorio, pero se ejecutan y mantienen por separado.
+> Sistema de gestión de citas psicológicas universitarias — plataforma web full-stack para conectar estudiantes con psicólogos certificados de manera confidencial y segura.
 
 ---
 
-## 📁 Estructura del proyecto
+## 📌 Descripción del proyecto
+
+**UniMente** es un portal de bienestar psicológico universitario desarrollado con una arquitectura moderna cliente-servidor. Permite a los estudiantes agendar citas con psicólogos, a los psicólogos gestionar su agenda y registrar sesiones clínicas, y a los administradores gestionar el catálogo de profesionales.
+
+---
+
+## 🏗️ Arquitectura general
 
 ```
 UniMente/
-├── backend/        # API con NestJS + GraphQL
-│   ├── src/
-│   ├── package.json
-│   └── ...
-│
-├── frontend/       # Aplicación web con React + TS
-│   ├── src/
-│   ├── package.json
-│   └── ...
-│
-└── README.md
+├── backend/          # API GraphQL — NestJS + TypeORM + MySQL
+├── frontend/         # SPA React — Apollo Client + CSS Modules
+├── README.md         # Este archivo
+├── BACKEND.md        # Documentación completa del backend
+└── FRONTEND.md       # Documentación completa del frontend
 ```
 
-Cada carpeta contiene su propio proyecto Node.js, con dependencias y scripts independientes.
+---
+
+## 📚 Documentación
+
+| Documento | Descripción |
+|---|---|
+| [BACKEND.md](./backend/BACKEND.md) | Setup, variables de entorno, tablas, endpoints GraphQL, autenticación JWT, scripts |
+| [FRONTEND.md](./frontend/FRONTEND.md) | Instalación, estructura de componentes, paleta de temas, rutas, dependencias |
 
 ---
 
-## 🚀 Tecnologías principales
+## 👥 Roles del sistema
 
-### Backend (NestJS)
-- NestJS
-- GraphQL (Apollo Server)
-- TypeScript
-- Arquitectura modular
-- Hot reload con `start:dev`
-
-### Frontend (React)
-- React + TypeScript
-- Vite
-- Apollo Client
-- Componentes modulares
+| Rol | Capacidades |
+|---|---|
+| **Estudiante** | Registro público, buscar psicólogos, agendar y cancelar citas |
+| **Psicólogo** | Gestionar horarios, ver agenda, registrar sesiones clínicas |
+| **Administrador** | Registrar psicólogos, ver todos los psicólogos y estudiantes |
 
 ---
 
-## ▶️ Cómo ejecutar el proyecto
+## 🗄️ Modelo de datos
 
-### 1) Clonar el repositorio
+```
+Rol ──< Usuario >── Estudiante
+                └── Psicologo ──< Horario_Psicologo
+                                └──< Cita >── Sesion
+                                              └──< Detalle_Historial
+                                                   └── Historial_Clinico
+```
+
+9 tablas relacionales con integridad referencial y constraint UNIQUE para evitar doble reserva en el mismo horario.
+
+---
+
+## ⚙️ Stack tecnológico
+
+### Backend
+| Tecnología | Versión | Rol |
+|---|---|---|
+| NestJS | 10+ | Framework principal |
+| GraphQL (code-first) | — | API layer |
+| Apollo Server | 4.x | Servidor GraphQL |
+| TypeORM | — | ORM |
+| MySQL | 8+ | Base de datos |
+| JWT + Passport | — | Autenticación |
+| bcrypt | — | Hash de contraseñas |
+
+### Frontend
+| Tecnología | Versión | Rol |
+|---|---|---|
+| React | 19 | UI library |
+| Vite | — | Build tool |
+| Apollo Client | 3.x | Cliente GraphQL |
+| React Router | 7 | Navegación SPA |
+| Lucide React | — | Iconografía |
+| CSS Modules | — | Estilos encapsulados |
+
+---
+
+## 🚀 Inicio rápido
+
+### Requisitos previos
+- Node.js 18+
+- MySQL 8+
+- npm 9+
+
+### 1. Clonar el repositorio
+
 ```bash
-git clone https://github.com/<organizacion>/UniMente.git
-cd UniMente
+git clone https://github.com/MonkyFlip/uni-mente.git
+cd unimente
 ```
 
----
+### 2. Configurar y arrancar el backend
 
-## 🛠️ Backend (NestJS)
-
-### Instalar dependencias
 ```bash
 cd backend
-npm install
+cp .env.example .env
+# Edita .env con tus credenciales de MySQL
+npm install --legacy-peer-deps
+nest start
 ```
 
-### Ejecutar en modo desarrollo
-```bash
-npm run start:dev
-```
+### 3. Configurar y arrancar el frontend
 
-### Endpoint GraphQL
-Una vez corriendo:
-
-```
-http://localhost:3000/graphql
-```
-
-Aquí puedes probar queries y mutations.
-
----
-
-## 🖥️ Frontend (React + Vite)
-
-### Instalar dependencias
 ```bash
 cd frontend
-npm install
-```
-
-### Ejecutar en modo desarrollo
-```bash
+npm install --legacy-peer-deps
 npm run dev
 ```
 
-### URL de desarrollo
+### 4. Abrir en el navegador
+
+| Servicio | URL |
+|---|---|
+| Frontend (app) | http://localhost:5173 |
+| Backend (GraphQL Sandbox) | http://localhost:3000/graphql |
+
+---
+
+## 🔑 Credenciales iniciales
+
+Después de ejecutar el `seed.sql` en el backend, el administrador inicial es:
+
 ```
-http://localhost:5173
+Correo:     admin@unimente.edu
+Contraseña: password
+```
+
+> ⚠️ Cambia estas credenciales antes de cualquier despliegue en producción.
+
+---
+
+## 🌿 Flujo de trabajo git sugerido
+
+```
+main          → rama estable, solo merges desde develop
+develop       → integración
+feature/xxx   → nuevas funcionalidades
+fix/xxx       → correcciones
 ```
 
 ---
 
-## 🔗 Comunicación Frontend ↔ Backend
+## 📋 Estado del proyecto
 
-El frontend se conecta al backend mediante Apollo Client, apuntando al endpoint:
-
-```
-http://localhost:3000/graphql
-```
-
-Asegúrate de que el backend esté corriendo antes de abrir el frontend.
-
----
-
-## 📦 Scripts útiles
-
-### Backend
-- `npm run start` — Ejecuta la API
-- `npm run start:dev` — Modo desarrollo con recarga automática
-- `npm run build` — Compila a producción
-
-### Frontend
-- `npm run dev` — Servidor de desarrollo
-- `npm run build` — Compila la app
-- `npm run preview` — Previsualiza la build
-
----
-
-## 🧩 Convenciones del monorepo
-
-- Cada proyecto tiene su propio `package.json`.
-- No se comparten `node_modules`.
-- Los commits deben describir cambios en **frontend**, **backend** o ambos.
-- La raíz del repo **no** contiene código ejecutable, solo organización.
-
----
-
-## 📚 Objetivo del proyecto
-
-UniMente busca desarrollar una plataforma modular que permita gestionar información académica mediante una arquitectura moderna basada en:
-
-- UI reactiva con React
-- API tipada con GraphQL
-- Backend escalable con NestJS
-- Buenas prácticas de separación de responsabilidades
-
----
+| Módulo | Estado |
+|---|---|
+| Auth JWT (login / registro) | ✅ Completo |
+| CRUD Estudiantes | ✅ Completo |
+| CRUD Psicólogos | ✅ Completo |
+| Horarios de disponibilidad | ✅ Completo |
+| Agendado de citas | ✅ Completo |
+| Registro de sesiones clínicas | ✅ Completo |
+| Historial clínico | ✅ Completo |
+| Frontend — Login / Registro | ✅ Completo |
+| Frontend — Dashboard por rol | ✅ Completo |
+| Frontend — Paleta de 5 temas | ✅ Completo |
+| Frontend — Agenda psicólogo | ✅ Completo |
+| Frontend — Horarios psicólogo | ✅ Completo |
+| Notificaciones / correos | 🔲 Pendiente |
+| Panel de estadísticas admin | 🔲 Pendiente |
+| App móvil | 🔲 Futuro |

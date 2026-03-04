@@ -1,0 +1,5 @@
+.card { max-width: 640px; }
+.formTitle { font-family: 'Playfair Display', serif; font-size: 20px; color: var(--white); margin-bottom: 24px; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.actions { grid-column: 1 / -1; margin-top: 8px; }
+@media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }

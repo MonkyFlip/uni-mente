@@ -1,6 +1,8 @@
-# 🧠 UniMente — Backend
+# ⚙️ UniMente — Backend
 
 API GraphQL construida con **NestJS + TypeORM + MySQL** para la plataforma de gestión de citas psicológicas universitarias.
+
+← [Volver al README principal](./README.md) | [Ver documentación del Frontend](./FRONTEND.md)
 
 ---
 
@@ -36,6 +38,12 @@ backend/
 
 Copia `.env.example` a `.env` y llena tus valores:
 
+**Windows (PowerShell)**
+```powershell
+Copy-Item .env.example .env
+```
+
+**Linux / macOS**
 ```bash
 cp .env.example .env
 ```
@@ -67,42 +75,46 @@ PORT=3000
 
 ## 🗄️ Base de datos
 
-### Crear/actualizar tablas automáticamente
+### Crear la base de datos
 
-TypeORM puede crear todas las tablas por ti al iniciar el servidor. Contrólalo desde el `.env`:
+**Windows (PowerShell)**
+```powershell
+mysql -u root -p -e "CREATE DATABASE unimente CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+```
+
+**Linux / macOS**
+```bash
+mysql -u root -p -e "CREATE DATABASE unimente CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+```
+
+### Controlar la sincronización de tablas desde `.env`
 
 | `DB_SYNCHRONIZE` | Comportamiento |
 |---|---|
-| `true` | Crea o actualiza las tablas al iniciar. Ideal para desarrollo inicial. |
-| `false` | No toca la BD al iniciar. Recomendado cuando las tablas ya están creadas. |
+| `true` | TypeORM crea o actualiza las tablas automáticamente al iniciar. Ideal para desarrollo inicial. |
+| `false` | No toca la BD al iniciar. Recomendado cuando las tablas ya existen. |
 
-Para que este valor sea leído desde `.env`, el `app.module.ts` debe usar:
+### Primer arranque — tablas nuevas
 
-```typescript
-synchronize: config.get('DB_SYNCHRONIZE') !== 'false',
+1. Asegúrate de tener `DB_SYNCHRONIZE=true` en `.env`
+2. Inicia el servidor — TypeORM crea todas las tablas automáticamente
+3. Ejecuta el seed para insertar roles y el admin inicial:
+
+**Windows (PowerShell)**
+```powershell
+mysql -u root -p unimente < seed.sql
 ```
 
-### Primer arranque (tablas nuevas)
-
-1. Crea la base de datos en MySQL:
-```sql
-CREATE DATABASE unimente CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-```
-
-2. En `.env` pon `DB_SYNCHRONIZE=true`
-
-3. Inicia el servidor — TypeORM crea todas las tablas automáticamente
-
-4. Ejecuta el seed para insertar los roles y el admin inicial:
+**Linux / macOS**
 ```bash
 mysql -u root -p unimente < seed.sql
 ```
 
-5. Una vez creadas las tablas, cambia a `DB_SYNCHRONIZE=false` para no recrearlas en cada reinicio
+4. Cambia a `DB_SYNCHRONIZE=false` para evitar recrear tablas en siguientes reinicios
 
-### Arranque normal (tablas ya existentes)
+### Arranque normal — tablas ya existentes
 
-Asegúrate de tener `DB_SYNCHRONIZE=false` en `.env` y simplemente inicia:
+Verifica que tienes `DB_SYNCHRONIZE=false` en `.env` e inicia:
 
 ```bash
 npm run start:dev
@@ -115,21 +127,10 @@ npm run start:dev
 ### Instalar dependencias
 
 ```bash
-cd backend
 npm install --legacy-peer-deps
 ```
 
-### Dependencias clave del proyecto
-
-```bash
-npm install @nestjs/graphql @nestjs/apollo @apollo/server@4.11.0 graphql \
-  @nestjs/typeorm typeorm mysql2 \
-  @nestjs/jwt @nestjs/passport passport passport-jwt \
-  @nestjs/config bcrypt class-validator class-transformer \
-  @types/bcrypt @types/passport-jwt --legacy-peer-deps
-```
-
-### Ejecutar en desarrollo (con hot reload)
+### Ejecutar en desarrollo (hot reload)
 
 ```bash
 npm run start:dev
@@ -141,7 +142,7 @@ npm run start:dev
 nest start
 ```
 
-### Compilar para producción
+### Compilar y ejecutar en producción
 
 ```bash
 npm run build
@@ -158,21 +159,18 @@ Una vez corriendo el servidor, abre en el navegador:
 http://localhost:3000/graphql
 ```
 
-Verás el **Apollo Sandbox embebido** con:
-- Editor de queries con autocompletado
-- Documentación del schema generada automáticamente
-- Pestaña **Headers** para agregar el token JWT
-- Queries de ejemplo precargados
+Verás el **Apollo Sandbox embebido** con editor de queries, autocompletado, documentación del schema y queries de ejemplo precargados.
 
 ---
 
 ## 🔐 Autenticación
 
-La API usa **JWT Bearer Token**. El flujo es:
+La API usa **JWT Bearer Token** con expiración de 8 horas.
 
-1. Hacer login con la mutation `login`
-2. Copiar el `access_token` de la respuesta
-3. En el Sandbox, ir a la pestaña **Headers** y agregar:
+**Flujo:**
+1. Ejecuta la mutation `login`
+2. Copia el `access_token` de la respuesta
+3. En el Sandbox → pestaña **Headers** → agrega:
 
 ```
 Authorization: Bearer <tu_token_aqui>
@@ -182,13 +180,13 @@ Authorization: Bearer <tu_token_aqui>
 
 | Rol | Permisos |
 |---|---|
-| `administrador` | Acceso total. Registra psicólogos. |
+| `administrador` | Acceso total. Único que puede registrar psicólogos. |
 | `psicologo` | Gestiona horarios, agenda, sesiones e historiales. |
 | `estudiante` | Agenda citas y ve sus propias citas. |
 
 ---
 
-## 📋 Operaciones GraphQL principales
+## 📋 Operaciones GraphQL
 
 ### Públicas (sin token)
 
@@ -201,6 +199,7 @@ mutation {
     password: "Pass1234!"
     matricula: "2021001"
     carrera: "Psicología"
+    telefono: "5551234567"
   }) {
     id_estudiante
     usuario { nombre correo }
@@ -210,8 +209,8 @@ mutation {
 # Login
 mutation {
   login(input: {
-    correo: "ana@uni.edu"
-    password: "Pass1234!"
+    correo: "admin@unimente.edu"
+    password: "password"
   }) {
     access_token
     rol
@@ -220,10 +219,10 @@ mutation {
 }
 ```
 
-### Requieren token (Bearer)
+### Requieren token Bearer
 
 ```graphql
-# Registrar psicólogo (solo admin)
+# Registrar psicólogo (solo administrador)
 mutation {
   registrarPsicologo(input: {
     nombre: "Dr. Carlos Ruiz"
@@ -231,19 +230,21 @@ mutation {
     password: "Pass1234!"
     especialidad: "Ansiedad y depresión"
     cedula: "12345678"
+    telefono: "5559876543"
   }) {
     id_psicologo
     usuario { nombre }
+    especialidad
   }
 }
 
-# Ver psicólogos disponibles
+# Ver psicólogos con horarios
 query {
   psicologos {
     id_psicologo
     especialidad
     usuario { nombre }
-    horarios { dia_semana hora_inicio hora_fin }
+    horarios { dia_semana hora_inicio hora_fin disponible }
   }
 }
 
@@ -251,7 +252,7 @@ query {
 mutation {
   agendarCita(input: {
     id_psicologo: 1
-    fecha: "2026-03-10"
+    fecha: "2026-04-10"
     hora_inicio: "09:00"
     hora_fin: "10:00"
     motivo: "Estrés académico"
@@ -262,18 +263,49 @@ mutation {
   }
 }
 
-# Ver expediente de estudiante (solo psicólogo/admin)
+# Ver citas del estudiante
+query {
+  citasEstudiante(id_estudiante: 1) {
+    id_cita
+    fecha
+    hora_inicio
+    estado
+    psicologo { usuario { nombre } especialidad }
+  }
+}
+
+# Ver agenda del psicólogo
+query {
+  agendaPsicologo(id_psicologo: 1) {
+    id_cita
+    fecha
+    hora_inicio
+    estado
+    estudiante { usuario { nombre } carrera }
+  }
+}
+
+# Registrar sesión clínica (psicólogo)
+mutation {
+  registrarSesion(input: {
+    id_cita: 1
+    numero_sesion: 1
+    notas: "Paciente presenta síntomas de ansiedad moderada."
+    recomendaciones: "Técnicas de respiración diafragmática."
+  }) {
+    id_sesion
+    numero_sesion
+    fecha_registro
+  }
+}
+
+# Ver expediente de estudiante (psicólogo / admin)
 query {
   expedienteEstudiante(id_estudiante: 1) {
     id_historial
     fecha_apertura
     detalles {
-      sesion {
-        numero_sesion
-        notas
-        recomendaciones
-        fecha_registro
-      }
+      sesion { numero_sesion notas recomendaciones fecha_registro }
     }
   }
 }
@@ -285,21 +317,21 @@ query {
 
 | Tabla | Descripción |
 |---|---|
-| `Rol` | Roles del sistema (administrador, psicólogo, estudiante) |
+| `Rol` | Roles del sistema: administrador, psicólogo, estudiante |
 | `Usuario` | Credenciales y datos base de todos los usuarios |
-| `Estudiante` | Perfil extendido del estudiante |
-| `Psicologo` | Perfil extendido del psicólogo |
-| `Horario_Psicologo` | Disponibilidad por día y hora |
-| `Cita` | Citas agendadas con estado (pendiente/asistida/cancelada) |
+| `Estudiante` | Perfil extendido: matrícula, carrera, teléfono |
+| `Psicologo` | Perfil extendido: especialidad, cédula |
+| `Horario_Psicologo` | Disponibilidad semanal por día y rango horario |
+| `Cita` | Citas agendadas con constraint UNIQUE por psicólogo+fecha+hora |
 | `Sesion` | Notas clínicas registradas al finalizar una cita |
 | `Historial_Clinico` | Expediente por par estudiante-psicólogo |
-| `Detalle_Historial` | Vínculo entre sesión y expediente |
+| `Detalle_Historial` | Vínculo N:M entre sesión y expediente |
 
 ---
 
 ## 🔗 Comunicación con el frontend
 
-El frontend React se conecta a esta API mediante **Apollo Client** apuntando a:
+El frontend se conecta a esta API en:
 
 ```
 http://localhost:3000/graphql

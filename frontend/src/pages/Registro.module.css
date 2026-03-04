@@ -1,0 +1,7 @@
+.wide { max-width: 480px !important; }
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.fullRow { grid-column: 1 / -1; margin-top: 4px; }

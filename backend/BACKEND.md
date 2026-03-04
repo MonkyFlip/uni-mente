@@ -2,7 +2,7 @@
 
 API GraphQL construida con **NestJS + TypeORM + MySQL** para la plataforma de gestión de citas psicológicas universitarias.
 
-← [Volver al README principal](../README.md) | [Ver documentación del Frontend](./frontend/FRONTEND.md)
+← [Volver al README principal](../README.md) | [Ver documentación del Frontend](../frontend/FRONTEND.md)
 
 ---
 

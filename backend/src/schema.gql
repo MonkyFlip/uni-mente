@@ -1,0 +1,191 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+type AuthPayload {
+  access_token: String!
+  nombre: String!
+  rol: String!
+}
+
+type Cita {
+  created_at: DateTime!
+  estado: EstadoCita!
+  estudiante: Estudiante!
+  fecha: String!
+  hora_fin: String!
+  hora_inicio: String!
+  id_cita: Int!
+  id_estudiante: Int!
+  id_psicologo: Int!
+  motivo: String
+  psicologo: Psicologo!
+  sesion: Sesion
+}
+
+input CreateCitaInput {
+  fecha: String!
+  hora_fin: String!
+  hora_inicio: String!
+  id_psicologo: Int!
+  motivo: String
+}
+
+input CreateEstudianteInput {
+  carrera: String
+  correo: String!
+  matricula: String
+  nombre: String!
+  password: String!
+  telefono: String
+}
+
+input CreateHorarioInput {
+  dia_semana: String!
+  hora_fin: String!
+  hora_inicio: String!
+  id_psicologo: Int!
+}
+
+input CreatePsicologoInput {
+  cedula: String
+  correo: String!
+  especialidad: String
+  nombre: String!
+  password: String!
+  telefono: String
+}
+
+input CreateSesionInput {
+  id_cita: Int!
+  notas: String
+  numero_sesion: Int!
+  recomendaciones: String
+}
+
+"""
+A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
+"""
+scalar DateTime
+
+type DetalleHistorial {
+  fecha_registro: DateTime!
+  id_detalle: Int!
+  id_historial: Int!
+  id_sesion: Int!
+  sesion: Sesion!
+}
+
+enum EstadoCita {
+  ASISTIDA
+  CANCELADA
+  PENDIENTE
+}
+
+type Estudiante {
+  carrera: String
+  id_estudiante: Int!
+  id_usuario: Int!
+  matricula: String
+  telefono: String
+  usuario: Usuario!
+}
+
+type HistorialClinico {
+  detalles: [DetalleHistorial!]
+  estudiante: Estudiante!
+  fecha_apertura: DateTime!
+  id_estudiante: Int!
+  id_historial: Int!
+  id_psicologo: Int!
+  psicologo: Psicologo!
+}
+
+type HorarioPsicologo {
+  dia_semana: String!
+  disponible: Boolean!
+  hora_fin: String!
+  hora_inicio: String!
+  id_horario: Int!
+  id_psicologo: Int!
+}
+
+input LoginInput {
+  correo: String!
+  password: String!
+}
+
+type Mutation {
+  actualizarHorario(id: Int!, input: UpdateHorarioInput!): HorarioPsicologo!
+  actualizarPsicologo(id: Int!, input: UpdatePsicologoInput!): Psicologo!
+  agendarCita(input: CreateCitaInput!): Cita!
+  cambiarEstadoCita(id_cita: Int!, input: UpdateEstadoCitaInput!): Cita!
+  crearHorario(input: CreateHorarioInput!): HorarioPsicologo!
+  eliminarHorario(id: Int!): Boolean!
+  login(input: LoginInput!): AuthPayload!
+  registrarEstudiante(input: CreateEstudianteInput!): Estudiante!
+  registrarPsicologo(input: CreatePsicologoInput!): Psicologo!
+  registrarSesion(input: CreateSesionInput!): Sesion!
+}
+
+type Psicologo {
+  cedula: String
+  especialidad: String
+  horarios: [HorarioPsicologo!]
+  id_psicologo: Int!
+  id_usuario: Int!
+  telefono: String
+  usuario: Usuario!
+}
+
+type Query {
+  agendaPsicologo(id_psicologo: Int!): [Cita!]!
+  citasEstudiante(id_estudiante: Int!): [Cita!]!
+  estudiante(id: Int!): Estudiante!
+  estudiantes: [Estudiante!]!
+  expedienteEstudiante(id_estudiante: Int!): [HistorialClinico!]!
+  historial(id: Int!): HistorialClinico!
+  horariosDisponibles(id_psicologo: Int!): [HorarioPsicologo!]!
+  psicologo(id: Int!): Psicologo!
+  psicologos: [Psicologo!]!
+}
+
+type Rol {
+  id_rol: Int!
+  nombre: String!
+}
+
+type Sesion {
+  cita: Cita!
+  fecha_registro: DateTime!
+  id_cita: Int!
+  id_sesion: Int!
+  notas: String
+  numero_sesion: Int!
+  recomendaciones: String
+}
+
+input UpdateEstadoCitaInput {
+  estado: EstadoCita!
+}
+
+input UpdateHorarioInput {
+  disponible: Boolean
+  hora_fin: String
+  hora_inicio: String
+}
+
+input UpdatePsicologoInput {
+  cedula: String
+  especialidad: String
+  telefono: String
+}
+
+type Usuario {
+  correo: String!
+  created_at: DateTime!
+  id_rol: Int!
+  id_usuario: Int!
+  nombre: String!
+  rol: Rol!
+}

@@ -15,10 +15,10 @@
 ```
 UniMente/
 ├── backend/          # API GraphQL — NestJS + TypeORM + MySQL
+│   └── BACKEND.md    # Documentación completa del backend
 ├── frontend/         # SPA React — Apollo Client + CSS Modules
-├── README.md         # Este archivo
-├── BACKEND.md        # Documentación completa del backend
-└── FRONTEND.md       # Documentación completa del frontend
+│   └── FRONTEND.md   # Documentación completa del frontend
+└── README.md         # Este archivo
 ```
 
 ---

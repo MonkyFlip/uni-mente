@@ -2,7 +2,7 @@
 
 SPA (Single Page Application) construida con **React 19 + Vite + Apollo Client** para la interfaz del sistema de citas psicológicas universitarias.
 
-← [Volver al README principal](./README.md) | [Ver documentación del Backend](./BACKEND.md)
+← [Volver al README principal](../README.md) | [Ver documentación del Backend](../backend/BACKEND.md)
 
 ---
 

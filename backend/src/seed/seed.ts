@@ -94,17 +94,24 @@ async function getId(conn: mysql.Connection, sql: string, params: any[]): Promis
 export async function runSeed(conn: mysql.Connection): Promise<void> {
   console.log('  Iniciando seed de datos de prueba...');
 
-  // Limpiar tablas en orden inverso de FK
+  // Limpiar TODAS las tablas en orden inverso de FK (incluyendo Usuario completo)
   await conn.query('SET FOREIGN_KEY_CHECKS = 0');
-  for (const t of ['Detalle_Historial','Historial_Clinico','Sesion','Cita','Horario_Psicologo','Psicologo','Estudiante']) {
+  for (const t of ['Detalle_Historial','Historial_Clinico','Sesion','Cita','Horario_Psicologo','Psicologo','Estudiante','Usuario']) {
     await conn.query(`TRUNCATE TABLE ${t}`);
   }
-  await conn.query(`DELETE FROM Usuario WHERE correo != 'admin@unimente.edu'`);
   await conn.query('SET FOREIGN_KEY_CHECKS = 1');
 
   // Leer id_rol con helper seguro
-  const id_rol_psi = await getId(conn, "SELECT id_rol FROM Rol WHERE nombre='psicologo'",  []);
-  const id_rol_est = await getId(conn, "SELECT id_rol FROM Rol WHERE nombre='estudiante'", []);
+  const id_rol_adm = await getId(conn, "SELECT id_rol FROM Rol WHERE nombre='administrador'", []);
+  const id_rol_psi = await getId(conn, "SELECT id_rol FROM Rol WHERE nombre='psicologo'",     []);
+  const id_rol_est = await getId(conn, "SELECT id_rol FROM Rol WHERE nombre='estudiante'",    []);
+
+  // Crear admin con bcrypt correcto para Admin1234!
+  const HASH_ADMIN = await bcrypt.hash('Admin1234!', 10);
+  await conn.query(
+    'INSERT INTO Usuario (nombre, correo, password_hash, id_rol) VALUES (?,?,?,?)',
+    ['Administrador', 'admin@unimente.edu', HASH_ADMIN, id_rol_adm],
+  );
 
   const HASH = await bcrypt.hash('Password123!', 10);
 

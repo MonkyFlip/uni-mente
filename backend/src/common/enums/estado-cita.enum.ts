@@ -1,5 +1,5 @@
 export enum EstadoCita {
-  PENDIENTE = 'pendiente',
-  ASISTIDA = 'asistida',
-  CANCELADA = 'cancelada',
+  PENDIENTE = 'PENDIENTE',
+  ASISTIDA  = 'ASISTIDA',
+  CANCELADA = 'CANCELADA',
 }

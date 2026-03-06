@@ -39,3 +39,15 @@
 .citaMotivo  { font-size: 12px; color: var(--cream-dim); font-style: italic; margin-top: 4px; }
 
 .citaActions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
+
+.searchBar { position: relative; margin-bottom: 24px; max-width: 420px; }
+.searchIcon { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: var(--cream-dim); pointer-events: none; }
+.searchInput { padding-left: 38px !important; background: var(--navy-card); border: 1px solid var(--border); width: 100%; }
+
+.sesionInfo {
+  display: flex; justify-content: space-between; align-items: center;
+  background: var(--navy); border-radius: 8px; padding: 10px 14px;
+  font-size: 13px; color: var(--cream-dim);
+  border: 1px solid var(--border);
+}
+.sesionInfo span:first-child { color: var(--cream); font-weight: 600; }

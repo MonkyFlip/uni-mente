@@ -1,61 +1,117 @@
 .searchBar {
   position: relative; margin-bottom: 24px; max-width: 420px;
-  animation: fadeUp 0.35s ease both;
+  animation: fadeUp 0.3s ease both;
 }
 .searchIcon {
-  position: absolute; left: 13px; top: 50%; transform: translateY(-50%);
-  color: var(--cream-dim); pointer-events: none;
+  position: absolute; left: 13px; top: 50%;
+  transform: translateY(-50%); color: var(--cream-dim); pointer-events: none;
 }
 .searchInput {
-  padding-left: 38px !important;
-  background: var(--navy-card);
-  border: 1px solid var(--border);
+  padding-left: 38px !important; background: var(--navy-card);
+  border: 1px solid var(--border); width: 100%;
 }
-.searchInput:focus { border-color: var(--teal); }
 
 .grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
   gap: 20px;
 }
 .grid > * { animation: fadeUp 0.4s ease both; }
 
 .card { display: flex; flex-direction: column; gap: 14px; }
+.card:hover { transform: translateY(-3px); box-shadow: 0 12px 32px rgba(0,0,0,0.3); }
 
 .cardTop { display: flex; align-items: center; gap: 12px; }
 .avatar {
-  width: 48px; height: 48px; border-radius: 14px;
+  width: 46px; height: 46px; border-radius: 12px;
   background: var(--teal-glow); color: var(--teal);
   font-weight: 700; font-size: 18px;
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
-  transition: background var(--transition), color var(--transition);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
 .name   { font-size: 15px; font-weight: 600; color: var(--white); }
-.correo { font-size: 12px; color: var(--cream-dim); margin-top: 2px; }
+.correo { font-size: 12px; color: var(--cream-dim); margin-top: 1px; }
 
 .especialidad {
-  display: flex; align-items: center; gap: 6px;
-  font-size: 12px; color: var(--teal);
-  background: var(--teal-glow);
-  border-radius: 6px; padding: 5px 10px;
-  width: fit-content;
-  transition: background var(--transition), color var(--transition);
+  display: flex; align-items: center; gap: 7px;
+  font-size: 13px; color: var(--teal);
 }
 
-.horarios { }
+.horarios { background: var(--navy); border-radius: 8px; padding: 10px 12px; }
 .horariosTitle {
   display: flex; align-items: center; gap: 5px;
   font-size: 11px; font-weight: 600; color: var(--cream-dim);
-  text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 7px;
+  text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px;
 }
-.horariosList { display: flex; flex-direction: column; gap: 4px; }
+.horariosList { display: flex; flex-direction: column; gap: 5px; }
 .horarioChip {
-  display: flex; justify-content: space-between; align-items: center;
-  background: var(--navy); border-radius: 6px; padding: 6px 10px;
+  display: flex; align-items: center; gap: 8px;
   font-size: 12px; color: var(--cream-dim);
-  border: 1px solid var(--border);
 }
-.horarioDia { text-transform: capitalize; color: var(--cream); font-weight: 500; }
+.horarioDia {
+  min-width: 68px; font-weight: 600; color: var(--cream);
+  font-size: 12px;
+}
+.sinHorarios {
+  font-size: 12px; color: var(--cream-dim); opacity: 0.6;
+  font-style: italic; text-align: center; padding: 6px 0;
+}
+
+/* ── Modal form ── */
+.modalForm { display: flex; flex-direction: column; gap: 16px; }
+
+.stepLabel {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 13px; font-weight: 600; color: var(--cream);
+}
+.stepNum {
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--teal); color: var(--navy);
+  font-size: 12px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+
+.horariosGrid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px;
+}
+.horarioBtn {
+  position: relative;
+  background: var(--navy); border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px 12px; cursor: pointer;
+  transition: all var(--transition); text-align: left;
+}
+.horarioBtn:hover { border-color: var(--teal); background: var(--navy-hover); }
+.horarioBtnActive {
+  border-color: var(--teal) !important;
+  background: var(--teal-glow) !important;
+  box-shadow: 0 0 0 2px var(--teal-glow);
+}
+.horarioBtnDia {
+  font-size: 13px; font-weight: 700; color: var(--white);
+  margin-bottom: 4px;
+}
+.horarioBtnHora {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 11px; color: var(--cream-dim);
+}
+.horarioBtnActive .horarioBtnHora { color: var(--teal); }
+.horarioBtnCheck {
+  position: absolute; top: 8px; right: 8px; color: var(--teal);
+}
+
+.fechaHint {
+  font-size: 12px; color: var(--cream-dim);
+  background: var(--navy); border-radius: 8px; padding: 8px 12px;
+  border-left: 3px solid var(--teal);
+}
+
+.resumen {
+  background: var(--navy); border-radius: 10px; padding: 12px 14px;
+  border: 1px solid rgba(var(--accent-rgb), 0.3);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.resumenItem {
+  display: flex; align-items: center; gap: 9px;
+  font-size: 13px; color: var(--cream);
+}
+.resumenItem svg { color: var(--teal); flex-shrink: 0; }
 
 @keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:none} }

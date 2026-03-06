@@ -1,4 +1,4 @@
-import { InputType, Field, ObjectType } from '@nestjs/graphql';
+import { InputType, Field, ObjectType, Int } from '@nestjs/graphql';
 import { IsEmail, MinLength } from 'class-validator';
 
 @InputType()
@@ -22,4 +22,10 @@ export class AuthPayload {
 
   @Field()
   nombre: string;
+
+  @Field()
+  correo: string;
+
+  @Field(() => Int, { nullable: true })
+  id_perfil?: number;
 }

@@ -4,13 +4,15 @@
 
 type AuthPayload {
   access_token: String!
+  correo: String!
+  id_perfil: Int
   nombre: String!
   rol: String!
 }
 
 type Cita {
   created_at: DateTime!
-  estado: EstadoCita!
+  estado: String!
   estudiante: Estudiante!
   fecha: String!
   hora_fin: String!
@@ -25,8 +27,7 @@ type Cita {
 
 input CreateCitaInput {
   fecha: String!
-  hora_fin: String!
-  hora_inicio: String!
+  id_horario: Int!
   id_psicologo: Int!
   motivo: String
 }

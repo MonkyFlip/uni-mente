@@ -66,3 +66,4 @@ export class EstudianteService {
     return this.estudianteRepo.findOne({ where: { id_usuario }, relations: ['usuario'] });
   }
 }
+

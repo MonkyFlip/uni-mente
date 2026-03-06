@@ -1,29 +1,41 @@
-.list { display: flex; flex-direction: column; gap: 12px; }
+.filters { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; animation: fadeUp 0.3s ease both; }
+.searchBar { position: relative; flex: 1; min-width: 200px; }
+.searchIcon { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: var(--cream-dim); pointer-events: none; }
+.searchInput { padding-left: 38px !important; background: var(--navy-card); border: 1px solid var(--border); width: 100%; }
+
+.estadoFilters { display: flex; gap: 6px; }
+.filterBtn {
+  padding: 6px 14px; border-radius: 99px; font-size: 12px; font-weight: 500;
+  background: var(--navy-card); border: 1px solid var(--border); color: var(--cream-dim);
+  cursor: pointer; transition: all var(--transition); font-family: 'Outfit', sans-serif;
+}
+.filterBtn:hover { border-color: var(--teal); color: var(--cream); }
+.filterActive { background: var(--teal-glow); border-color: var(--teal); color: var(--teal); }
+
+.list { display: flex; flex-direction: column; gap: 10px; }
+.list > * { animation: fadeUp 0.4s ease both; }
 
 .citaCard {
-  display: flex; align-items: center; gap: 20px;
-  background: var(--navy-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 18px 20px;
-  transition: border-color 0.2s;
+  display: flex; align-items: center; gap: 18px;
+  background: var(--navy-card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px 18px;
+  transition: all var(--transition);
 }
-.citaCard:hover { border-color: rgba(10,181,168,0.25); }
+.citaCard:hover { border-color: rgba(255,255,255,0.12); transform: translateX(3px); }
 
-.citaLeft { flex-shrink: 0; }
 .citaFecha {
-  width: 56px;
-  background: var(--navy);
-  border-radius: 10px;
-  padding: 10px 8px;
-  text-align: center;
+  width: 54px; flex-shrink: 0;
+  background: var(--navy); border-radius: 10px; padding: 8px 6px; text-align: center;
+  border: 1px solid var(--border);
 }
-.citaDia  { display: block; font-size: 15px; font-weight: 700; color: var(--white); text-transform: capitalize; }
-.citaHora { display: block; font-size: 11px; color: var(--teal); margin-top: 3px; }
+.citaDia  { display: block; font-size: 14px; font-weight: 700; color: var(--white); text-transform: capitalize; }
+.citaHora { display: flex; align-items: center; justify-content: center; gap: 3px; font-size: 11px; color: var(--teal); margin-top: 4px; }
 
-.citaInfo { flex: 1; }
-.citaPsicologo  { font-size: 15px; font-weight: 600; color: var(--white); margin-bottom: 2px; }
-.citaEspecialidad { font-size: 12px; color: var(--teal); margin-bottom: 4px; }
-.citaMotivo { font-size: 12px; color: var(--cream-dim); font-style: italic; }
+.citaInfo { flex: 1; min-width: 0; }
+.citaPsicologo   { font-size: 15px; font-weight: 600; color: var(--white); }
+.citaEspecialidad { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--teal); margin-top: 3px; }
+.citaMotivo { font-size: 12px; color: var(--cream-dim); font-style: italic; margin-top: 4px; }
 
 .citaRight { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; flex-shrink: 0; }
+
+@keyframes fadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }

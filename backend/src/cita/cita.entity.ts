@@ -1,23 +1,17 @@
 import { ObjectType, Field, Int, registerEnumType } from '@nestjs/graphql';
 import {
-  Column,
-  CreateDateColumn,
-  Entity,
-  JoinColumn,
-  ManyToOne,
-  OneToOne,
-  PrimaryGeneratedColumn,
-  Unique,
+  Column, CreateDateColumn, Entity, JoinColumn,
+  ManyToOne, OneToOne, PrimaryGeneratedColumn, Unique,
 } from 'typeorm';
 import { EstadoCita } from '../common/enums/estado-cita.enum';
 import { Estudiante } from '../estudiante/estudiante.entity';
 import { Psicologo } from '../psicologo/psicologo.entity';
 import { Sesion } from '../sesion/sesion.entity';
 
+// Registrar el enum para que los InputTypes (UpdateEstadoCitaInput) lo usen
 registerEnumType(EstadoCita, { name: 'EstadoCita' });
 
 @ObjectType()
-// RF: No se permiten dos citas para el mismo psicólogo en el mismo horario
 @Unique(['id_psicologo', 'fecha', 'hora_inicio'])
 @Entity('Cita')
 export class Cita {
@@ -55,9 +49,15 @@ export class Cita {
   @Column({ type: 'time' })
   hora_fin: string;
 
-  @Field(() => EstadoCita)
-  @Column({ type: 'enum', enum: EstadoCita, default: EstadoCita.PENDIENTE })
-  estado: EstadoCita;
+  /**
+   * VARCHAR en BD y String en GraphQL.
+   * Evita el bug de TypeORM con columnas ENUM y el error de serialización
+   * "Enum EstadoCita cannot represent value: ''".
+   * El enum EstadoCita sigue existiendo para validar inputs (UpdateEstadoCitaInput).
+   */
+  @Field()                                              // ← String, no EstadoCita
+  @Column({ type: 'varchar', length: 20, default: 'PENDIENTE' })
+  estado: string;
 
   @Field({ nullable: true })
   @Column({ type: 'text', nullable: true })

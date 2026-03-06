@@ -14,14 +14,20 @@ const FEATURES = [
 ];
 
 export default function Login() {
-  const [correo, setCorreo] = useState('');
+  const [correo, setCorreo]   = useState('');
   const [password, setPassword] = useState('');
   const { login } = useAuth();
-  const navigate = useNavigate();
+  const navigate  = useNavigate();
 
   const [doLogin, { loading, error }] = useMutation(LOGIN, {
     onCompleted: ({ login: data }) => {
-      login({ token: data.access_token, rol: data.rol, nombre: data.nombre });
+      login({
+        token:     data.access_token,
+        rol:       data.rol,
+        nombre:    data.nombre,
+        correo:    data.correo,
+        id_perfil: data.id_perfil ?? undefined,
+      });
       navigate('/dashboard');
     },
   });
@@ -41,13 +47,9 @@ export default function Login() {
 
       <div className={styles.left}>
         <div className={styles.heroContent}>
-          <div className={styles.logoWrap}>
-            <Brain size={32} strokeWidth={1.5} />
-          </div>
+          <div className={styles.logoWrap}><Brain size={32} strokeWidth={1.5} /></div>
           <h1 className={styles.heroTitle}>UniMente</h1>
-          <p className={styles.heroText}>
-            Portal de bienestar psicológico universitario. Conectamos estudiantes con profesionales de salud mental.
-          </p>
+          <p className={styles.heroText}>Portal de bienestar psicológico universitario. Conectamos estudiantes con profesionales de salud mental.</p>
           <div className={styles.features}>
             {FEATURES.map(({ icon: Icon, text }) => (
               <div key={text} className={styles.feature}>
@@ -65,7 +67,6 @@ export default function Login() {
             <h2 className={styles.formTitle}>Bienvenido de vuelta</h2>
             <p className={styles.formSub}>Ingresa tus credenciales para continuar</p>
           </div>
-
           <form onSubmit={handleSubmit} className={styles.form}>
             {error && <Alert message={error.message.replace('GraphQL error: ', '')} />}
             <Field label="Correo electrónico">
@@ -74,15 +75,10 @@ export default function Login() {
             <Field label="Contraseña">
               <input type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required />
             </Field>
-            <Button
-              type="submit" loading={loading} size="lg"
-              icon={!loading ? <ArrowRight size={16} /> : undefined}
-              style={{ width: '100%', marginTop: 8 }}
-            >
+            <Button type="submit" loading={loading} size="lg" icon={!loading ? <ArrowRight size={16}/> : undefined} style={{ width:'100%', marginTop:8 }}>
               Iniciar sesión
             </Button>
           </form>
-
           <p className={styles.registerLink}>
             ¿Primera vez? <Link to="/registro">Crea tu cuenta de estudiante</Link>
           </p>

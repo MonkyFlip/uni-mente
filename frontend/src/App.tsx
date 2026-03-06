@@ -13,6 +13,7 @@ import MisCitas           from './pages/estudiante/MisCitas';
 import Agenda             from './pages/psicologo/Agenda';
 import Horarios           from './pages/psicologo/Horarios';
 import RegistrarPsicologo from './pages/admin/RegistrarPsicologo';
+import AdminPsicologos    from './pages/admin/Psicologos';
 
 export default function App() {
   return (
@@ -21,11 +22,11 @@ export default function App() {
         <AuthProvider>
           <BrowserRouter>
             <Routes>
-              <Route path="/login"   element={<Login />} />
+              <Route path="/login"    element={<Login />} />
               <Route path="/registro" element={<Registro />} />
-              <Route path="/"        element={<Navigate to="/login" replace />} />
+              <Route path="/"         element={<Navigate to="/login" replace />} />
 
-              <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+              <Route path="/dashboard"  element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               <Route path="/psicologos" element={<ProtectedRoute><Psicologos /></ProtectedRoute>} />
 
               <Route path="/mis-citas" element={<ProtectedRoute roles={['estudiante']}><MisCitas /></ProtectedRoute>} />
@@ -34,6 +35,7 @@ export default function App() {
               <Route path="/horarios" element={<ProtectedRoute roles={['psicologo']}><Horarios /></ProtectedRoute>} />
 
               <Route path="/registrar-psicologo" element={<ProtectedRoute roles={['administrador']}><RegistrarPsicologo /></ProtectedRoute>} />
+              <Route path="/admin/psicologos"    element={<ProtectedRoute roles={['administrador']}><AdminPsicologos /></ProtectedRoute>} />
 
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>

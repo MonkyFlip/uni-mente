@@ -1,167 +1,288 @@
-# 🧠 UniMente
+# UniMente
 
-> Sistema de gestión de citas psicológicas universitarias — plataforma web full-stack para conectar estudiantes con psicólogos certificados de manera confidencial y segura.
-
----
-
-## 📌 Descripción del proyecto
-
-**UniMente** es un portal de bienestar psicológico universitario desarrollado con una arquitectura moderna cliente-servidor. Permite a los estudiantes agendar citas con psicólogos, a los psicólogos gestionar su agenda y registrar sesiones clínicas, y a los administradores gestionar el catálogo de profesionales.
+Portal de Bienestar Universitario — Sistema de gestión de atención psicológica que conecta estudiantes con psicólogos certificados de manera confidencial y segura.
 
 ---
 
-## 🏗️ Arquitectura general
+## Descripción del sistema
 
-```
-UniMente/
-├── backend/          # API GraphQL — NestJS + TypeORM + MySQL
-│   └── BACKEND.md    # Documentación completa del backend
-├── frontend/         # SPA React — Apollo Client + CSS Modules
-│   └── FRONTEND.md   # Documentación completa del frontend
-└── README.md         # Este archivo
-```
+UniMente permite a los estudiantes universitarios acceder a servicios de salud mental de forma sencilla. El sistema cubre el ciclo completo: desde el agendamiento de una cita hasta el registro de sesiones clínicas y el mantenimiento del historial del paciente.
+
+**Roles del sistema:**
+- **Estudiante** — Busca psicólogos disponibles, agenda citas y consulta su historial
+- **Psicólogo** — Gestiona su disponibilidad semanal, registra sesiones y mantiene expedientes
+- **Administrador** — Registra y gestiona el equipo de psicólogos
 
 ---
 
-## 📚 Documentación
+## Stack tecnológico
 
-| Documento | Descripción |
+| Capa | Tecnología |
 |---|---|
-| [BACKEND.md](./backend/BACKEND.md) | Setup, variables de entorno, tablas, endpoints GraphQL, autenticación JWT, scripts |
-| [FRONTEND.md](./frontend/FRONTEND.md) | Instalación, estructura de componentes, paleta de temas, rutas, dependencias |
+| Frontend | React 18 · TypeScript · Vite · Apollo Client · React Router |
+| Backend | NestJS · TypeORM · Apollo Server · Passport JWT |
+| Base de datos | MySQL 8.0 |
+| Comunicación | GraphQL |
 
 ---
 
-## 👥 Roles del sistema
+## Requisitos previos
 
-| Rol | Capacidades |
+| Herramienta | Versión mínima |
 |---|---|
-| **Estudiante** | Registro público, buscar psicólogos, agendar y cancelar citas |
-| **Psicólogo** | Gestionar horarios, ver agenda, registrar sesiones clínicas |
-| **Administrador** | Registrar psicólogos, ver todos los psicólogos y estudiantes |
+| Node.js | 18 LTS |
+| npm | 9 |
+| MySQL | 8.0 |
 
----
+**Instalar Node.js**
 
-## 🗄️ Modelo de datos
+Windows / macOS: https://nodejs.org (instalador LTS)
 
-```
-Rol ──< Usuario >── Estudiante
-                └── Psicologo ──< Horario_Psicologo
-                                └──< Cita >── Sesion
-                                              └──< Detalle_Historial
-                                                   └── Historial_Clinico
+Linux (Ubuntu / Debian):
+```bash
+curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+sudo apt-get install -y nodejs
 ```
 
-9 tablas relacionales con integridad referencial y constraint UNIQUE para evitar doble reserva en el mismo horario.
-
 ---
 
-## ⚙️ Stack tecnológico
-
-### Backend
-| Tecnología | Versión | Rol |
-|---|---|---|
-| NestJS | 10+ | Framework principal |
-| GraphQL (code-first) | — | API layer |
-| Apollo Server | 4.x | Servidor GraphQL |
-| TypeORM | — | ORM |
-| MySQL | 8+ | Base de datos |
-| JWT + Passport | — | Autenticación |
-| bcrypt | — | Hash de contraseñas |
-
-### Frontend
-| Tecnología | Versión | Rol |
-|---|---|---|
-| React | 19 | UI library |
-| Vite | — | Build tool |
-| Apollo Client | 3.x | Cliente GraphQL |
-| React Router | 7 | Navegación SPA |
-| Lucide React | — | Iconografía |
-| CSS Modules | — | Estilos encapsulados |
-
----
-
-## 🚀 Inicio rápido
-
-### Requisitos previos
-- Node.js 18+
-- MySQL 8+
-- npm 9+
+## Instalación
 
 ### 1. Clonar el repositorio
 
 ```bash
 git clone https://github.com/MonkyFlip/uni-mente.git
-cd unimente
+cd uni-mente
 ```
 
-### 2. Configurar y arrancar el backend
+### 2. Configurar el backend
 
 ```bash
 cd backend
-cp .env.example .env
-# Edita .env con tus credenciales de MySQL
-npm install --legacy-peer-deps
-nest start
+npm install
 ```
 
-### 3. Configurar y arrancar el frontend
+Crear el archivo `backend/.env`:
+
+```env
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=root
+DB_PASSWORD=tu_password_aqui
+DB_NAME=unimente
+
+JWT_SECRET=unimente_super_secret_2024
+JWT_EXPIRES=8h
+```
+
+### 3. Configurar el frontend
 
 ```bash
-cd frontend
-npm install --legacy-peer-deps
+cd ../frontend
+npm install
+```
+
+Crear el archivo `frontend/.env` (opcional, ya apunta a `localhost:3000` por defecto):
+
+```env
+VITE_API_URL=http://localhost:3000/graphql
+```
+
+---
+
+## Iniciar el proyecto
+
+Abre **dos terminales** simultáneas:
+
+**Terminal 1 — Backend:**
+```bash
+cd uni-mente/backend
+npm run start:dev
+```
+
+**Terminal 2 — Frontend:**
+```bash
+cd uni-mente/frontend
 npm run dev
 ```
 
-### 4. Abrir en el navegador
-
 | Servicio | URL |
 |---|---|
-| Frontend (app) | http://localhost:5173 |
-| Backend (GraphQL Sandbox) | http://localhost:3000/graphql |
+| Aplicación web | http://localhost:5173 |
+| API GraphQL | http://localhost:3000/graphql |
+| Apollo Sandbox | http://localhost:3000/graphql (abrir en navegador) |
+
+### Primera ejecución
+
+Al levantar el backend por primera vez:
+
+1. Crea automáticamente la base de datos `unimente` si no existe
+2. Crea todas las tablas con `CREATE TABLE IF NOT EXISTS`
+3. Detecta que la BD está vacía y ejecuta el seed automáticamente
+4. Genera ~1 100 registros de prueba bien relacionados
+
+En consola verás:
+
+```
+Base de datos inicializada correctamente.
+BD vacía — ejecutando seed de datos de prueba...
+  Iniciando seed de datos de prueba...
+  Seed completado:
+    Psicologos: 12  |  Horarios: 42  |  Estudiantes: 80
+    Citas: 451  |  Sesiones: 238  |  Historiales: 89
+  Acceso: psicologo1@unimente.edu / estudiante1@unimente.edu  →  Password123!
+UniMente Backend corriendo en http://localhost:3000/graphql
+```
 
 ---
 
-## 🔑 Credenciales iniciales
+## Credenciales de acceso
 
-Después de ejecutar el `seed.sql` en el backend, el administrador inicial es:
-
-```
-Correo:     admin@unimente.edu
-Contraseña: password
-```
-
-> ⚠️ Cambia estas credenciales antes de cualquier despliegue en producción.
+| Rol | Correo | Contraseña |
+|---|---|---|
+| Administrador | admin@unimente.edu | Admin1234! |
+| Psicólogo | psicologo1@unimente.edu … psicologo12@unimente.edu | Password123! |
+| Estudiante | estudiante1@unimente.edu … estudiante80@unimente.edu | Password123! |
 
 ---
 
-## 🌿 Flujo de trabajo git sugerido
+## Estructura del repositorio
 
 ```
-main          → rama estable, solo merges desde develop
-develop       → integración
-feature/xxx   → nuevas funcionalidades
-fix/xxx       → correcciones
+uni-mente/
+├── backend/
+│   ├── src/
+│   │   ├── app.module.ts        # Init BD automático + seed al arrancar
+│   │   ├── database/
+│   │   │   └── init.sql         # CREATE TABLE IF NOT EXISTS (idempotente)
+│   │   ├── seed/
+│   │   │   └── seed.ts          # ~1 100 registros de prueba
+│   │   ├── auth/                # JWT login
+│   │   ├── common/              # Guards, decorators, enums
+│   │   ├── cita/                # Entidad, resolver, service
+│   │   ├── sesion/
+│   │   ├── historial-clinico/
+│   │   ├── psicologo/
+│   │   ├── estudiante/
+│   │   └── ...
+│   ├── .env                     # Variables de entorno (crear manualmente)
+│   └── package.json
+│
+├── frontend/
+│   ├── src/
+│   │   ├── App.tsx              # Rutas + providers
+│   │   ├── apollo/client.ts     # Apollo con auth link y error link
+│   │   ├── auth/                # AuthContext, ProtectedRoute
+│   │   ├── components/          # UI, Layout, Sidebar, DatePicker, TimePicker
+│   │   ├── graphql/
+│   │   │   └── operations.ts    # Todas las queries y mutations
+│   │   └── pages/
+│   │       ├── admin/           # Gestión de psicólogos
+│   │       ├── estudiante/      # Buscar psicólogos, mis citas
+│   │       └── psicologo/       # Agenda, horarios
+│   ├── .env                     # (opcional)
+│   └── package.json
+│
+├── BACKEND.md                   # Documentación completa del backend
+├── FRONTEND.md                  # Documentación completa del frontend
+└── README.md                    # Este archivo
 ```
 
 ---
 
-## 📋 Estado del proyecto
+## Flujos principales del sistema
 
-| Módulo | Estado |
-|---|---|
-| Auth JWT (login / registro) | ✅ Completo |
-| CRUD Estudiantes | ✅ Completo |
-| CRUD Psicólogos | ✅ Completo |
-| Horarios de disponibilidad | ✅ Completo |
-| Agendado de citas | ✅ Completo |
-| Registro de sesiones clínicas | ✅ Completo |
-| Historial clínico | ✅ Completo |
-| Frontend — Login / Registro | ✅ Completo |
-| Frontend — Dashboard por rol | ✅ Completo |
-| Frontend — Paleta de 5 temas | ✅ Completo |
-| Frontend — Agenda psicólogo | ✅ Completo |
-| Frontend — Horarios psicólogo | ✅ Completo |
-| Notificaciones / correos | 🔲 Pendiente |
-| Panel de estadísticas admin | 🔲 Pendiente |
-| App móvil | 🔲 Futuro |
+### Estudiante agenda una cita
+
+```
+1. Login → /dashboard
+2. Ir a /psicologos
+3. Seleccionar psicólogo → "Agendar cita"
+4. Elegir horario disponible
+5. Seleccionar fecha (solo días del horario elegido)
+6. Escribir motivo (opcional)
+7. Confirmar → Cita creada con estado PENDIENTE
+```
+
+### Psicólogo registra una sesión
+
+```
+1. Login → /agenda
+2. Ver citas del día con estado PENDIENTE
+3. Clic en "Registrar sesión"
+4. Ingresar notas clínicas y recomendaciones
+5. Confirmar → (transacción única):
+   - Sesión guardada
+   - Cita marcada como ASISTIDA
+   - Historial clínico creado o actualizado
+   - Detalle vinculado al historial
+```
+
+### Administrador registra un psicólogo
+
+```
+1. Login → /admin/psicologos
+2. Clic en "Registrar psicólogo"
+3. Ingresar nombre, correo, contraseña (obligatorios)
+4. Especialidad, cédula, teléfono (opcionales)
+5. Confirmar → Psicólogo listo para definir horarios
+```
+
+---
+
+## Decisiones técnicas destacadas
+
+### `estado` como VARCHAR en lugar de ENUM
+
+La columna `Cita.estado` se almacena como `VARCHAR(20)` en MySQL en lugar de `ENUM`. TypeORM tiene un bug documentado donde el mapeo de columnas `ENUM` puede devolver el valor vacío en memoria después de un `save()`. Combinado con `@Field(() => EstadoCita)` en NestJS GraphQL, esto produce el error `Enum "EstadoCita" cannot represent value: ""`.
+
+La solución usa tres cambios coordinados: `VARCHAR` en la BD, `string` en TypeORM, y `@Field()` (String) en el output de GraphQL. El enum `EstadoCita` se mantiene únicamente para validar los inputs.
+
+### Raw SQL para escrituras de estado
+
+Cualquier actualización del campo `estado` usa SQL directo:
+```typescript
+await this.dataSource.query('UPDATE Cita SET estado = ? WHERE id_cita = ?', [valor, id]);
+```
+Esto garantiza que el valor llega a MySQL sin ninguna transformación del ORM.
+
+### Campos opcionales nunca se envían como `""`
+
+Los formularios del frontend usan funciones `strip()` y `clean()` que convierten las cadenas vacías a `undefined` antes de enviar las mutations. De esta forma el backend recibe `null` para guardar `NULL` en MySQL, en lugar de guardar `""`.
+
+### IDs de perfil resueltos en el backend
+
+Los IDs `id_estudiante` e `id_psicologo` nunca vienen del cliente. Siempre se extraen del JWT en el backend, lo que garantiza que un usuario no puede manipular datos de otro.
+
+### Inicialización automática de BD y seed
+
+Al ejecutar `nest start`, el backend crea la BD, las tablas y los datos de prueba automáticamente. No hay pasos manuales de migración.
+
+---
+
+## Documentación completa
+
+- [BACKEND.md](./BACKEND.md) — Arquitectura, API GraphQL, decisiones técnicas del backend
+- [FRONTEND.md](./FRONTEND.md) — Componentes, rutas, Apollo Client, bugs resueltos del frontend
+
+---
+
+## Comandos de referencia rápida
+
+```bash
+# Clonar
+git clone https://github.com/MonkyFlip/uni-mente.git
+
+# Instalar dependencias (backend y frontend)
+cd uni-mente/backend  && npm install
+cd ../frontend        && npm install
+
+# Levantar todo
+cd ../backend  && npm run start:dev   # Terminal 1
+cd ../frontend && npm run dev         # Terminal 2
+
+# Reiniciar datos de prueba (backend)
+cd backend
+npm run seed           # macOS / Linux
+npx ts-node -r tsconfig-paths/register src\seed\seed.ts  # Windows
+```

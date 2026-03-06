@@ -22,8 +22,8 @@ const NAV = {
   ],
   administrador: [
     { to: '/dashboard',           Icon: LayoutDashboard, label: 'Inicio' },
-    { to: '/registrar-psicologo', Icon: UserPlus,         label: 'Registrar Psicólogo' },
-    { to: '/psicologos',          Icon: Users,            label: 'Psicólogos' },
+    { to: '/admin/psicologos',    Icon: Users,            label: 'Psicólogos' },
+    { to: '/registrar-psicologo', Icon: UserPlus,         label: 'Nuevo Psicólogo' },
   ],
 };
 
@@ -98,3 +98,4 @@ export function Sidebar() {
     </aside>
   );
 }
+

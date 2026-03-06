@@ -18,7 +18,11 @@ export class CitaResolver {
     private readonly estudianteService: EstudianteService,
   ) {}
 
-  /** El estudiante agenda su propia cita */
+  /**
+   * El estudiante agenda una cita en un horario registrado por el psicólogo.
+   * - id_estudiante: resuelto desde el JWT (nunca desde el input)
+   * - hora_inicio / hora_fin: tomadas del horario, no del input
+   */
   @UseGuards(RolesGuard)
   @Roles(RolNombre.ESTUDIANTE)
   @Mutation(() => Cita)
@@ -28,12 +32,14 @@ export class CitaResolver {
   ): Promise<Cita> {
     const estudiante = await this.estudianteService.findByUsuario(user.id_usuario);
     if (!estudiante) {
-      throw new NotFoundException('Perfil de estudiante no encontrado para este usuario.');
+      throw new NotFoundException(
+        'Perfil de estudiante no encontrado. Vuelve a iniciar sesión.',
+      );
     }
     return this.citaService.create(estudiante.id_estudiante, input);
   }
 
-  /** El psicólogo ve su agenda */
+  /** El psicólogo o admin ve la agenda de un psicólogo */
   @UseGuards(RolesGuard)
   @Roles(RolNombre.PSICOLOGO, RolNombre.ADMINISTRADOR)
   @Query(() => [Cita], { name: 'agendaPsicologo' })
@@ -53,9 +59,9 @@ export class CitaResolver {
     return this.citaService.findByEstudiante(id);
   }
 
-  /** Cambiar estado (asistida / cancelada) */
+  /** Cambiar estado — psicólogo/admin: asistida o cancelada; estudiante: solo cancelar */
   @UseGuards(RolesGuard)
-  @Roles(RolNombre.PSICOLOGO, RolNombre.ADMINISTRADOR)
+  @Roles(RolNombre.PSICOLOGO, RolNombre.ADMINISTRADOR, RolNombre.ESTUDIANTE)
   @Mutation(() => Cita)
   async cambiarEstadoCita(
     @Args('id_cita', { type: () => Int }) id: number,

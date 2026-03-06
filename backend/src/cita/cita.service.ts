@@ -1,43 +1,56 @@
 import {
-  Injectable,
-  ConflictException,
-  NotFoundException,
+  Injectable, ConflictException, NotFoundException, BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { Cita } from './cita.entity';
 import { CreateCitaInput, UpdateEstadoCitaInput } from './dto/cita.input';
-import { EstadoCita } from '../common/enums/estado-cita.enum';
+import { HorarioPsicologo } from '../horario-psicologo/horario-psicologo.entity';
+
+const DIA_MAP: Record<string, number> = {
+  domingo: 0, lunes: 1, martes: 2, miercoles: 3,
+  jueves: 4, viernes: 5, sabado: 6,
+};
 
 @Injectable()
 export class CitaService {
   constructor(
-    @InjectRepository(Cita) private readonly repo: Repository<Cita>,
+    @InjectRepository(Cita)
+    private readonly repo: Repository<Cita>,
+    @InjectRepository(HorarioPsicologo)
+    private readonly horarioRepo: Repository<HorarioPsicologo>,
+    private readonly dataSource: DataSource,
   ) {}
 
   async create(id_estudiante: number, input: CreateCitaInput): Promise<Cita> {
-    // RF: Integridad — no se puede agendar si ya existe cita en ese horario
-    const conflicto = await this.repo.findOne({
-      where: {
-        id_psicologo: input.id_psicologo,
-        fecha: input.fecha,
-        hora_inicio: input.hora_inicio,
-        estado: EstadoCita.PENDIENTE,
-      },
+    const horario = await this.horarioRepo.findOne({
+      where: { id_horario: input.id_horario, id_psicologo: input.id_psicologo, disponible: true },
     });
-    if (conflicto)
-      throw new ConflictException(
-        'El psicólogo ya tiene una cita en ese horario.',
-      );
+    if (!horario) throw new NotFoundException('El horario seleccionado no existe o no está disponible.');
 
-    const cita = this.repo.create({ id_estudiante, ...input });
-    return this.repo.save(cita);
+    const [anio, mes, dia] = input.fecha.split('-').map(Number);
+    const fecha = new Date(anio, mes - 1, dia);
+    if (fecha.getDay() !== (DIA_MAP[horario.dia_semana.toLowerCase()] ?? -1)) {
+      throw new BadRequestException(`La fecha no corresponde al día "${horario.dia_semana}" del horario.`);
+    }
+
+    const conflicto = await this.repo.findOne({
+      where: { id_psicologo: input.id_psicologo, fecha: input.fecha, hora_inicio: horario.hora_inicio, estado: 'PENDIENTE' },
+    });
+    if (conflicto) throw new ConflictException('El psicólogo ya tiene una cita en ese horario para esa fecha.');
+
+    const result = await this.dataSource.query(
+      `INSERT INTO Cita (id_estudiante, id_psicologo, fecha, hora_inicio, hora_fin, estado, motivo)
+       VALUES (?, ?, ?, ?, ?, 'PENDIENTE', ?)`,
+      [id_estudiante, input.id_psicologo, input.fecha, horario.hora_inicio, horario.hora_fin, input.motivo ?? null],
+    );
+    return this.findOne(result.insertId);
   }
 
   async findByPsicologo(id_psicologo: number): Promise<Cita[]> {
     return this.repo.find({
       where: { id_psicologo },
-      relations: ['estudiante', 'sesion'],
+      relations: ['estudiante', 'estudiante.usuario', 'sesion'],
       order: { fecha: 'ASC', hora_inicio: 'ASC' },
     });
   }
@@ -45,7 +58,7 @@ export class CitaService {
   async findByEstudiante(id_estudiante: number): Promise<Cita[]> {
     return this.repo.find({
       where: { id_estudiante },
-      relations: ['psicologo'],
+      relations: ['psicologo', 'psicologo.usuario'],
       order: { fecha: 'DESC' },
     });
   }
@@ -53,15 +66,18 @@ export class CitaService {
   async findOne(id: number): Promise<Cita> {
     const c = await this.repo.findOne({
       where: { id_cita: id },
-      relations: ['estudiante', 'psicologo', 'sesion'],
+      relations: ['estudiante', 'estudiante.usuario', 'psicologo', 'psicologo.usuario', 'sesion'],
     });
     if (!c) throw new NotFoundException(`Cita #${id} no encontrada.`);
     return c;
   }
 
   async updateEstado(id: number, input: UpdateEstadoCitaInput): Promise<Cita> {
-    const c = await this.findOne(id);
-    c.estado = input.estado;
-    return this.repo.save(c);
+    // Raw SQL — evita cualquier transformación de TypeORM sobre el valor del campo
+    await this.dataSource.query(
+      'UPDATE Cita SET estado = ? WHERE id_cita = ?',
+      [input.estado, id],
+    );
+    return this.findOne(id);
   }
 }

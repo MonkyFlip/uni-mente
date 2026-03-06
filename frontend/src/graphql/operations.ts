@@ -6,6 +6,8 @@ export const LOGIN = gql`
       access_token
       rol
       nombre
+      correo
+      id_perfil
     }
   }
 `;
@@ -17,6 +19,7 @@ export const REGISTRAR_ESTUDIANTE = gql`
       usuario { nombre correo }
       carrera
       matricula
+      telefono
     }
   }
 `;
@@ -27,7 +30,8 @@ export const GET_ESTUDIANTES = gql`
       id_estudiante
       matricula
       carrera
-      usuario { nombre correo }
+      telefono
+      usuario { id_usuario nombre correo }
     }
   }
 `;
@@ -39,7 +43,7 @@ export const GET_PSICOLOGOS = gql`
       especialidad
       cedula
       telefono
-      usuario { nombre correo }
+      usuario { id_usuario nombre correo }
       horarios { id_horario dia_semana hora_inicio hora_fin disponible }
     }
   }
@@ -51,6 +55,8 @@ export const REGISTRAR_PSICOLOGO = gql`
       id_psicologo
       usuario { nombre correo }
       especialidad
+      cedula
+      telefono
     }
   }
 `;
@@ -62,6 +68,7 @@ export const ACTUALIZAR_PSICOLOGO = gql`
       especialidad
       cedula
       telefono
+      usuario { nombre correo }
     }
   }
 `;
@@ -84,6 +91,11 @@ export const ELIMINAR_HORARIO = gql`
   }
 `;
 
+/**
+ * AgendarCita — el backend resuelve id_estudiante desde el JWT
+ * y hora_inicio/hora_fin desde el horario seleccionado.
+ * Solo se envía: id_psicologo, id_horario, fecha y motivo opcional.
+ */
 export const AGENDAR_CITA = gql`
   mutation AgendarCita($input: CreateCitaInput!) {
     agendarCita(input: $input) {
@@ -130,7 +142,13 @@ export const CAMBIAR_ESTADO_CITA = gql`
   mutation CambiarEstadoCita($id_cita: Int!, $input: UpdateEstadoCitaInput!) {
     cambiarEstadoCita(id_cita: $id_cita, input: $input) {
       id_cita
+      fecha
+      hora_inicio
+      hora_fin
       estado
+      motivo
+      estudiante { id_estudiante matricula carrera usuario { nombre correo } }
+      psicologo  { id_psicologo especialidad usuario { nombre } }
     }
   }
 `;

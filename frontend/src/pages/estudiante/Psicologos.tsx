@@ -1,35 +1,103 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
-import { Search, Calendar, Clock, User, Stethoscope } from 'lucide-react';
+import { Search, Calendar, Clock, User, Stethoscope, CheckCircle2 } from 'lucide-react';
 import { Layout } from '../../components/Layout';
-import { PageHeader, Card, Badge, Button, EmptyState, Spinner, Modal, Field, Alert } from '../../components/UI';
+import { PageHeader, Card, Button, EmptyState, Spinner, Modal, Field, Alert, Badge } from '../../components/UI';
+import { DatePicker } from '../../components/DatePicker';
 import { GET_PSICOLOGOS, AGENDAR_CITA } from '../../graphql/operations';
 import { useAuth } from '../../auth/AuthContext';
 import styles from './Psicologos.module.css';
 
+const DIAS_ES: Record<string, string> = {
+  lunes: 'Lunes', martes: 'Martes', miercoles: 'Miércoles',
+  jueves: 'Jueves', viernes: 'Viernes', sabado: 'Sábado', domingo: 'Domingo',
+};
+
+const DIA_TO_JS: Record<string, number> = {
+  domingo: 0, lunes: 1, martes: 2, miercoles: 3,
+  jueves: 4, viernes: 5, sabado: 6,
+};
+
+function proximaFechaDia(diaSemana: string): string {
+  const target = DIA_TO_JS[diaSemana.toLowerCase()] ?? 1;
+  const hoy = new Date();
+  const diff = (target - hoy.getDay() + 7) % 7;
+  const d = new Date(hoy);
+  d.setDate(hoy.getDate() + (diff === 0 ? 7 : diff));
+  return d.toISOString().split('T')[0];
+}
+
+function fechaValidaParaDia(fecha: string, diaSemana: string): boolean {
+  if (!fecha) return false;
+  const [y, m, d] = fecha.split('-').map(Number);
+  return new Date(y, m - 1, d).getDay() === (DIA_TO_JS[diaSemana.toLowerCase()] ?? -1);
+}
+
+function fmt(t: string) { return (t ?? '').slice(0, 5); }
+
 export default function Psicologos() {
   const { user } = useAuth();
   const { data, loading } = useQuery(GET_PSICOLOGOS);
-  const [selected, setSelected] = useState<any>(null);
-  const [searchVal, setSearchVal] = useState('');
-  const [form, setForm] = useState({ fecha: '', hora_inicio: '', hora_fin: '', motivo: '' });
-  const [success, setSuccess] = useState('');
+
+  const [selected,    setSelected]    = useState<any>(null);
+  const [horarioSel,  setHorarioSel]  = useState<any>(null);
+  const [fecha,       setFecha]       = useState('');
+  const [motivo,      setMotivo]      = useState('');
+  const [searchVal,   setSearchVal]   = useState('');
+  const [success,     setSuccess]     = useState('');
 
   const [agendar, { loading: agendando, error: errorAgendar }] = useMutation(AGENDAR_CITA, {
     onCompleted: () => {
-      setSuccess('¡Cita agendada exitosamente!');
-      setTimeout(() => { setSelected(null); setSuccess(''); }, 2000);
+      setSuccess('Cita agendada exitosamente.');
+      setTimeout(() => {
+        setSelected(null); setHorarioSel(null);
+        setFecha(''); setMotivo(''); setSuccess('');
+      }, 2000);
     },
   });
 
-  const psicologos = (data?.psicologos ?? []).filter((p: any) =>
-    p.usuario.nombre.toLowerCase().includes(searchVal.toLowerCase()) ||
-    (p.especialidad ?? '').toLowerCase().includes(searchVal.toLowerCase())
-  );
+  const psicologos = useMemo(() =>
+    (data?.psicologos ?? []).filter((p: any) =>
+      p.usuario.nombre.toLowerCase().includes(searchVal.toLowerCase()) ||
+      (p.especialidad ?? '').toLowerCase().includes(searchVal.toLowerCase())
+    ), [data, searchVal]);
+
+  const horariosDisponibles = useMemo(() =>
+    (selected?.horarios ?? []).filter((h: any) => h.disponible),
+    [selected]);
+
+  const openModal = (p: any) => {
+    setSelected(p); setHorarioSel(null);
+    setFecha(''); setMotivo(''); setSuccess('');
+  };
+
+  const selectHorario = (h: any) => {
+    setHorarioSel(h);
+    setFecha(proximaFechaDia(h.dia_semana));
+  };
+
+  const manana = (() => {
+    const d = new Date(); d.setDate(d.getDate() + 1);
+    return d.toISOString().split('T')[0];
+  })();
 
   const handleAgendar = (e: React.FormEvent) => {
     e.preventDefault();
-    agendar({ variables: { input: { id_psicologo: selected.id_psicologo, ...form } } });
+    if (!horarioSel || !fecha) return;
+    if (!fechaValidaParaDia(fecha, horarioSel.dia_semana)) return;
+
+    // id_horario y id_psicologo son requeridos — no pueden ser 0 o undefined
+    if (!selected?.id_psicologo || !horarioSel?.id_horario) return;
+
+    const input: Record<string, any> = {
+      id_psicologo: selected.id_psicologo,
+      id_horario:   horarioSel.id_horario,
+      fecha,
+    };
+    // motivo es opcional — solo incluirlo si tiene contenido real
+    if (motivo.trim()) input.motivo = motivo.trim();
+
+    agendar({ variables: { input } });
   };
 
   return (
@@ -46,75 +114,177 @@ export default function Psicologos() {
         />
       </div>
 
-      {loading && <div style={{ display:'flex', justifyContent:'center', padding:64 }}><Spinner size={36} /></div>}
+      {loading && (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: 64 }}>
+          <Spinner size={36} />
+        </div>
+      )}
 
       {!loading && psicologos.length === 0 && (
-        <EmptyState icon={<User size={28} />} title="Sin psicólogos" description="No se encontraron psicólogos registrados." />
+        <EmptyState icon={<User size={28} />} title="Sin psicólogos"
+          description="No se encontraron psicólogos registrados." />
       )}
 
       <div className={`${styles.grid} stagger`}>
-        {psicologos.map((p: any, i: number) => (
-          <Card key={p.id_psicologo} hoverable className={styles.card} style={{ animationDelay: `${i * 60}ms` } as any}>
-            <div className={styles.cardTop}>
-              <div className={styles.avatar}>{p.usuario.nombre.charAt(0)}</div>
-              <div>
-                <div className={styles.name}>{p.usuario.nombre}</div>
-                <div className={styles.correo}>{p.usuario.correo}</div>
-              </div>
-            </div>
-
-            {p.especialidad && (
-              <div className={styles.especialidad}>
-                <Stethoscope size={13} />
-                <span>{p.especialidad}</span>
-              </div>
-            )}
-
-            {p.horarios?.filter((h:any) => h.disponible).length > 0 && (
-              <div className={styles.horarios}>
-                <div className={styles.horariosTitle}>
-                  <Clock size={12} /> Disponibilidad
-                </div>
-                <div className={styles.horariosList}>
-                  {p.horarios.filter((h: any) => h.disponible).map((h: any) => (
-                    <div key={h.id_horario} className={styles.horarioChip}>
-                      <span className={styles.horarioDia}>{h.dia_semana}</span>
-                      <span>{h.hora_inicio.slice(0,5)} – {h.hora_fin.slice(0,5)}</span>
-                    </div>
-                  ))}
+        {psicologos.map((p: any) => {
+          const disponibles = (p.horarios ?? []).filter((h: any) => h.disponible);
+          return (
+            <Card key={p.id_psicologo} hoverable className={styles.card}>
+              <div className={styles.cardTop}>
+                <div className={styles.avatar}>{p.usuario.nombre.charAt(0)}</div>
+                <div>
+                  <div className={styles.name}>{p.usuario.nombre}</div>
+                  <div className={styles.correo}>{p.usuario.correo}</div>
                 </div>
               </div>
-            )}
 
-            {user?.rol === 'estudiante' && (
-              <Button
-                variant="primary" size="sm"
-                icon={<Calendar size={14} />}
-                style={{ marginTop: 'auto', width: '100%' }}
-                onClick={() => { setSelected(p); setForm({ fecha:'', hora_inicio:'', hora_fin:'', motivo:'' }); }}
-              >
-                Agendar cita
-              </Button>
-            )}
-          </Card>
-        ))}
+              {p.especialidad && (
+                <div className={styles.especialidad}>
+                  <Stethoscope size={13} />
+                  <span>{p.especialidad}</span>
+                </div>
+              )}
+
+              {disponibles.length > 0 ? (
+                <div className={styles.horarios}>
+                  <div className={styles.horariosTitle}><Clock size={12} /> Disponibilidad</div>
+                  <div className={styles.horariosList}>
+                    {disponibles.map((h: any) => (
+                      <div key={h.id_horario} className={styles.horarioChip}>
+                        <span className={styles.horarioDia}>{DIAS_ES[h.dia_semana] ?? h.dia_semana}</span>
+                        <span>{fmt(h.hora_inicio)} – {fmt(h.hora_fin)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className={styles.sinHorarios}>Sin horarios disponibles aún</div>
+              )}
+
+              {user?.rol === 'estudiante' && disponibles.length > 0 && (
+                <Button
+                  variant="primary" size="sm"
+                  icon={<Calendar size={14} />}
+                  style={{ marginTop: 'auto', width: '100%' }}
+                  onClick={() => openModal(p)}
+                >
+                  Agendar cita
+                </Button>
+              )}
+            </Card>
+          );
+        })}
       </div>
 
-      <Modal open={!!selected} onClose={() => setSelected(null)} title={`Agendar con ${selected?.usuario?.nombre}`}>
-        {success && <Alert message={success} type="success" />}
-        {errorAgendar && <Alert message={errorAgendar.message} />}
-        <form onSubmit={handleAgendar} style={{ display:'flex', flexDirection:'column', gap:14 }}>
-          <Field label="Fecha">
-            <input type="date" value={form.fecha} onChange={e => setForm(f=>({...f,fecha:e.target.value}))} required min={new Date().toISOString().split('T')[0]} />
-          </Field>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-            <Field label="Hora inicio"><input type="time" value={form.hora_inicio} onChange={e=>setForm(f=>({...f,hora_inicio:e.target.value}))} required /></Field>
-            <Field label="Hora fin"><input type="time" value={form.hora_fin} onChange={e=>setForm(f=>({...f,hora_fin:e.target.value}))} required /></Field>
+      <Modal
+        open={!!selected}
+        onClose={() => setSelected(null)}
+        title={`Agendar con ${selected?.usuario?.nombre ?? ''}`}
+      >
+        {success      && <Alert message={success} type="success" />}
+        {errorAgendar && <Alert message={errorAgendar.message.replace('GraphQL error: ', '')} />}
+
+        <form onSubmit={handleAgendar} className={styles.modalForm}>
+
+          {/* Paso 1: Horario */}
+          <div className={styles.stepLabel}>
+            <span className={styles.stepNum}>1</span>
+            Selecciona un horario disponible
           </div>
-          <Field label="Motivo (opcional)">
-            <textarea placeholder="Describe brevemente el motivo..." value={form.motivo} onChange={e=>setForm(f=>({...f,motivo:e.target.value}))} rows={3} style={{resize:'vertical'}} />
-          </Field>
-          <Button type="submit" loading={agendando} size="lg" style={{width:'100%'}} icon={<Calendar size={16} />}>Confirmar cita</Button>
+          <div className={styles.horariosGrid}>
+            {horariosDisponibles.map((h: any) => (
+              <button
+                key={h.id_horario}
+                type="button"
+                className={`${styles.horarioBtn} ${horarioSel?.id_horario === h.id_horario ? styles.horarioBtnActive : ''}`}
+                onClick={() => selectHorario(h)}
+              >
+                <div className={styles.horarioBtnDia}>{DIAS_ES[h.dia_semana] ?? h.dia_semana}</div>
+                <div className={styles.horarioBtnHora}>
+                  <Clock size={11} />
+                  {fmt(h.hora_inicio)} – {fmt(h.hora_fin)}
+                </div>
+                {horarioSel?.id_horario === h.id_horario && (
+                  <CheckCircle2 size={14} className={styles.horarioBtnCheck} />
+                )}
+              </button>
+            ))}
+          </div>
+
+          {/* Paso 2: Fecha */}
+          {horarioSel && (
+            <>
+              <div className={styles.stepLabel}>
+                <span className={styles.stepNum}>2</span>
+                Elige una fecha ({DIAS_ES[horarioSel.dia_semana] ?? horarioSel.dia_semana})
+              </div>
+              <div className={styles.fechaHint}>
+                Solo puedes seleccionar fechas que sean{' '}
+                <strong>{DIAS_ES[horarioSel.dia_semana] ?? horarioSel.dia_semana}</strong>.
+              </div>
+              <Field label="">
+                <DatePicker
+                  value={fecha}
+                  onChange={v => setFecha(v)}
+                  min={manana}
+                  diaPermitido={DIA_TO_JS[horarioSel.dia_semana.toLowerCase()]}
+                />
+              </Field>
+
+              {fecha && (
+                <div className={styles.resumen}>
+                  <div className={styles.resumenItem}>
+                    <Calendar size={14} />
+                    <span>
+                      {new Date(fecha + 'T12:00:00').toLocaleDateString('es-MX', {
+                        weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+                      })}
+                    </span>
+                  </div>
+                  <div className={styles.resumenItem}>
+                    <Clock size={14} />
+                    <span>{fmt(horarioSel.hora_inicio)} – {fmt(horarioSel.hora_fin)}</span>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Paso 3: Motivo opcional */}
+          {horarioSel && fecha && (
+            <>
+              <div className={styles.stepLabel}>
+                <span className={styles.stepNum}>3</span>
+                Motivo de la consulta (opcional)
+              </div>
+              <Field label="">
+                <textarea
+                  placeholder="Describe brevemente el motivo de tu consulta..."
+                  value={motivo}
+                  onChange={e => setMotivo(e.target.value)}
+                  rows={3}
+                  style={{ resize: 'vertical' }}
+                />
+              </Field>
+            </>
+          )}
+
+          <Button
+            type="submit"
+            loading={agendando}
+            size="lg"
+            style={{ width: '100%' }}
+            icon={<Calendar size={16} />}
+            disabled={
+              !horarioSel ||
+              !fecha ||
+              !fechaValidaParaDia(fecha, horarioSel?.dia_semana) ||
+              !selected?.id_psicologo ||
+              !horarioSel?.id_horario
+            }
+          >
+            Confirmar cita
+          </Button>
         </form>
       </Modal>
     </Layout>

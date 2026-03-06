@@ -1,9 +1,11 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, ReactNode } from 'react';
 
-interface User {
+export interface User {
   nombre: string;
+  correo: string;
   rol: 'administrador' | 'psicologo' | 'estudiante';
   token: string;
+  id_perfil?: number;
 }
 
 interface AuthContextType {

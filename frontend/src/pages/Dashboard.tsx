@@ -1,9 +1,9 @@
 import { useAuth } from '../auth/AuthContext';
 import { Layout } from '../components/Layout';
-import { PageHeader, StatCard, Card } from '../components/UI';
+import { PageHeader, StatCard } from '../components/UI';
 import {
   Calendar, CheckCircle, Users, Clock,
-  Search, ClipboardList, UserPlus, Lightbulb, ChevronRight,
+  Search, ClipboardList, UserPlus, Lightbulb, ChevronRight, Sparkles,
 } from 'lucide-react';
 import styles from './Dashboard.module.css';
 
@@ -20,7 +20,7 @@ export default function Dashboard() {
   return (
     <Layout>
       <PageHeader
-        title={`Hola, ${user?.nombre?.split(' ')[0]} `}
+        title={`Hola, ${user?.nombre?.split(' ')[0]}`}
         subtitle={`Bienvenido al portal UniMente — ${new Date().toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`}
       />
 
@@ -32,15 +32,15 @@ export default function Dashboard() {
       {user?.rol === 'estudiante' && (
         <>
           <div className={`${styles.statsGrid} stagger`}>
-            <StatCard icon={<Calendar size={22} />} label="Citas pendientes" value="—" />
-            <StatCard icon={<CheckCircle size={22} />} label="Sesiones completadas" value="—" />
-            <StatCard icon={<Users size={22} />} label="Psicólogos disponibles" value="—" />
+            <StatCard icon={<Calendar size={22} />}     label="Citas pendientes"     value="—" />
+            <StatCard icon={<CheckCircle size={22} />}  label="Sesiones completadas" value="—" />
+            <StatCard icon={<Users size={22} />}        label="Psicólogos disponibles" value="—" />
           </div>
           <div className={styles.quickActions}>
             <h3 className={styles.sectionTitle}>Acciones rápidas</h3>
             <div className={`${styles.actionsGrid} stagger`}>
-              <ActionCard href="/psicologos" icon={<Search size={22} />} title="Buscar psicólogo" desc="Explora los psicólogos disponibles y sus horarios" />
-              <ActionCard href="/mis-citas"  icon={<ClipboardList size={22} />} title="Ver mis citas" desc="Consulta y gestiona tus citas programadas" />
+              <ActionCard href="/psicologos" icon={<Search size={22} />}      title="Buscar psicólogo" desc="Explora los psicólogos disponibles y sus horarios" />
+              <ActionCard href="/mis-citas"  icon={<ClipboardList size={22} />} title="Ver mis citas"    desc="Consulta y gestiona tus citas programadas" />
             </div>
           </div>
         </>
@@ -49,14 +49,14 @@ export default function Dashboard() {
       {user?.rol === 'psicologo' && (
         <>
           <div className={`${styles.statsGrid} stagger`}>
-            <StatCard icon={<Calendar size={22} />} label="Citas hoy" value="—" />
-            <StatCard icon={<Clock size={22} />} label="Pendientes" value="—" />
-            <StatCard icon={<Users size={22} />} label="Pacientes totales" value="—" />
+            <StatCard icon={<Calendar size={22} />} label="Citas hoy"        value="—" />
+            <StatCard icon={<Clock size={22} />}    label="Pendientes"       value="—" />
+            <StatCard icon={<Users size={22} />}    label="Pacientes totales" value="—" />
           </div>
           <div className={styles.quickActions}>
             <h3 className={styles.sectionTitle}>Acciones rápidas</h3>
             <div className={`${styles.actionsGrid} stagger`}>
-              <ActionCard href="/agenda"   icon={<Calendar size={22} />} title="Ver mi agenda" desc="Revisa todas tus citas programadas" />
+              <ActionCard href="/agenda"   icon={<Calendar size={22} />} title="Ver mi agenda"      desc="Revisa todas tus citas programadas" />
               <ActionCard href="/horarios" icon={<Clock size={22} />}    title="Gestionar horarios" desc="Define tus días y horas disponibles" />
             </div>
           </div>
@@ -66,15 +66,15 @@ export default function Dashboard() {
       {user?.rol === 'administrador' && (
         <>
           <div className={`${styles.statsGrid} stagger`}>
-            <StatCard icon={<Users size={22} />}    label="Psicólogos activos" value="—" />
-            <StatCard icon={<Users size={22} />}    label="Estudiantes registrados" value="—" />
-            <StatCard icon={<Calendar size={22} />} label="Citas totales" value="—" />
+            <StatCard icon={<Users size={22} />}    label="Psicólogos activos"      value="—" />
+            <StatCard icon={<Users size={22} />}    label="Estudiantes registrados"  value="—" />
+            <StatCard icon={<Calendar size={22} />} label="Citas totales"            value="—" />
           </div>
           <div className={styles.quickActions}>
             <h3 className={styles.sectionTitle}>Administración</h3>
             <div className={`${styles.actionsGrid} stagger`}>
-              <ActionCard href="/registrar-psicologo" icon={<UserPlus size={22} />} title="Registrar psicólogo" desc="Añade un nuevo profesional al sistema" />
-              <ActionCard href="/psicologos"          icon={<Users size={22} />}    title="Ver psicólogos" desc="Consulta todos los psicólogos registrados" />
+              <ActionCard href="/admin/psicologos"    icon={<Users size={22} />}    title="Ver psicólogos"      desc="Consulta todos los psicólogos registrados" />
+              <ActionCard href="/registrar-psicologo" icon={<UserPlus size={22} />} title="Nuevo psicólogo"     desc="Añade un nuevo profesional al sistema" />
             </div>
           </div>
         </>

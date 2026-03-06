@@ -1,20 +1,20 @@
 import { InputType, Field, Int } from '@nestjs/graphql';
-import { IsOptional, IsString } from 'class-validator';
+import { IsInt, IsOptional, IsString } from 'class-validator';
 import { EstadoCita } from '../../common/enums/estado-cita.enum';
 
 @InputType()
 export class CreateCitaInput {
   @Field(() => Int)
+  @IsInt()
   id_psicologo: number;
 
-  @Field()
-  fecha: string; // 'YYYY-MM-DD'
+  @Field(() => Int)
+  @IsInt()
+  id_horario: number;
 
   @Field()
-  hora_inicio: string; // 'HH:MM'
-
-  @Field()
-  hora_fin: string;
+  @IsString()
+  fecha: string;
 
   @Field({ nullable: true })
   @IsOptional()

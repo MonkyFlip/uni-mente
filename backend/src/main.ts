@@ -34,7 +34,7 @@ const SANDBOX_HTML = `<!DOCTYPE html>
 </head>
 <body>
   <div id="header">
-    <h1>🧠 UniMente API</h1>
+    <h1>UniMente API</h1>
     <span>http://localhost:3000/graphql</span>
     <span id="badge">GraphQL</span>
   </div>
@@ -76,6 +76,6 @@ async function bootstrap() {
   app.useGlobalPipes(new ValidationPipe({ whitelist: true }));
 
   await app.listen(3000);
-  console.log('🚀 UniMente Backend corriendo en http://localhost:3000/graphql');
+  console.log('UniMente Backend corriendo en http://localhost:3000/graphql');
 }
 bootstrap();

@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useMutation } from '@apollo/client';
 import {
   Brain, ShieldCheck, FileHeart, TrendingUp,
-  ArrowRight, Lock, Eye, EyeOff, KeyRound,
+  ArrowRight, Lock, Eye, EyeOff, KeyRound, ShieldAlert,
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { LOGIN, CAMBIAR_PASSWORD } from '../graphql/operations';
@@ -17,7 +17,9 @@ const FEATURES = [
   { icon: TrendingUp,  text: 'Seguimiento personalizado'         },
 ];
 
-// ─── Subcomponente: modal de cambio de contraseña ─────────────────
+// ─── Modal: Cambiar contraseña ────────────────────────────────────
+// El código MFA es SIEMPRE obligatorio — evita que cualquiera
+// cambie la contraseña de otra persona sin autorización.
 function CambiarPasswordModal({
   open,
   onClose,
@@ -25,54 +27,43 @@ function CambiarPasswordModal({
   open: boolean;
   onClose: () => void;
 }) {
-  const [correo,      setCorreo]      = useState('');
-  const [pwdActual,   setPwdActual]   = useState('');
-  const [pwdNueva,    setPwdNueva]    = useState('');
-  const [codigoMfa,   setCodigoMfa]   = useState('');
-  const [showAct,     setShowAct]     = useState(false);
-  const [showNew,     setShowNew]     = useState(false);
-  const [needMfa,     setNeedMfa]     = useState(false);
-  const [successMsg,  setSuccessMsg]  = useState('');
+  const [correo,     setCorreo]    = useState('');
+  const [pwdActual,  setPwdActual] = useState('');
+  const [pwdNueva,   setPwdNueva]  = useState('');
+  const [codigoMfa,  setCodigoMfa] = useState('');
+  const [showAct,    setShowAct]   = useState(false);
+  const [showNew,    setShowNew]   = useState(false);
+  const [successMsg, setSuccess]   = useState('');
 
-  // Usamos el mismo correo para login temporal y luego cambiamos pwd
   const [cambiarPassword, { loading, error }] = useMutation(CAMBIAR_PASSWORD, {
     onCompleted: () => {
-      setSuccessMsg('Contraseña actualizada correctamente. Ya puedes iniciar sesión.');
-      setTimeout(() => {
-        onClose();
-        setSuccessMsg('');
-        reset();
-      }, 2500);
-    },
-    onError: (e) => {
-      // Si el error menciona MFA, mostrar el campo
-      if (e.message.includes('MFA') || e.message.includes('código')) {
-        setNeedMfa(true);
-      }
-    },
-    context: {
-      // El cambio de contraseña requiere estar autenticado;
-      // el token se obtiene automáticamente de localStorage si existe.
+      setSuccess('Contraseña actualizada correctamente. Ya puedes iniciar sesión con tu nueva contraseña.');
+      setTimeout(() => { onClose(); reset(); }, 2800);
     },
   });
 
   const reset = () => {
     setCorreo(''); setPwdActual(''); setPwdNueva('');
-    setCodigoMfa(''); setShowAct(false); setShowNew(false);
-    setNeedMfa(false); setSuccessMsg('');
+    setCodigoMfa(''); setShowAct(false); setShowNew(false); setSuccess('');
   };
 
   const handleClose = () => { onClose(); reset(); };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const input: any = {
-      password_actual: pwdActual,
-      password_nuevo:  pwdNueva,
-    };
-    if (codigoMfa.trim()) input.codigo_mfa = codigoMfa.trim();
-    cambiarPassword({ variables: { input } });
+    if (codigoMfa.length !== 6) return;
+    cambiarPassword({
+      variables: {
+        input: {
+          password_actual: pwdActual,
+          password_nuevo:  pwdNueva,
+          codigo_mfa:      codigoMfa,
+        },
+      },
+    });
   };
+
+  const canSubmit = correo.trim() && pwdActual && pwdNueva.length >= 8 && codigoMfa.length === 6;
 
   return (
     <Modal open={open} onClose={handleClose} title="Cambiar contraseña">
@@ -81,10 +72,15 @@ function CambiarPasswordModal({
         <Alert message={error.message.replace('GraphQL error: ', '')} />
       )}
 
-      <p className={pwdStyles.intro}>
-        Para cambiar tu contraseña debes ingresar la contraseña actual y la nueva.
-        Si tu cuenta tiene MFA activo, también se requerirá el código de verificación.
-      </p>
+      {/* Aviso de seguridad */}
+      <div className={pwdStyles.securityNote}>
+        <ShieldAlert size={16} style={{ color: 'var(--teal)', flexShrink: 0 }} />
+        <p>
+          Por seguridad, el cambio de contraseña <strong>siempre requiere el código MFA</strong> de tu app
+          autenticadora (Google Authenticator, Microsoft Authenticator).
+          Esto garantiza que solo tú puedes cambiar tu contraseña.
+        </p>
+      </div>
 
       <form onSubmit={handleSubmit} className={pwdStyles.form}>
         <Field label="Correo de tu cuenta">
@@ -129,35 +125,28 @@ function CambiarPasswordModal({
           </div>
         </Field>
 
-        {/* Campo MFA — aparece si el usuario lo tiene activo o si el error lo pide */}
-        {(needMfa || codigoMfa) && (
-          <Field label="Código MFA (si está configurado en tu cuenta)">
-            <div className={pwdStyles.mfaRow}>
-              <KeyRound size={15} style={{ color: 'var(--teal)', flexShrink: 0 }} />
-              <input
-                type="text"
-                inputMode="numeric"
-                maxLength={6}
-                value={codigoMfa}
-                onChange={e => setCodigoMfa(e.target.value.replace(/\D/g, ''))}
-                placeholder="123456"
-                className={pwdStyles.codeInput}
-                autoFocus={needMfa}
-              />
+        {/* Código MFA — siempre visible y obligatorio */}
+        <Field label="Código MFA (obligatorio)">
+          <div className={pwdStyles.mfaBlock}>
+            <div className={pwdStyles.mfaLabelRow}>
+              <KeyRound size={14} style={{ color: 'var(--teal)' }} />
+              <span>Ingresa el código de 6 dígitos de tu app autenticadora</span>
             </div>
-          </Field>
-        )}
-
-        {!needMfa && !codigoMfa && (
-          <button
-            type="button"
-            className={pwdStyles.mfaToggle}
-            onClick={() => setNeedMfa(true)}
-          >
-            <KeyRound size={13} />
-            Mi cuenta tiene MFA activo
-          </button>
-        )}
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength={6}
+              value={codigoMfa}
+              onChange={e => setCodigoMfa(e.target.value.replace(/\D/g, ''))}
+              placeholder="1  2  3  4  5  6"
+              className={pwdStyles.codeInput}
+              required
+            />
+            {codigoMfa.length > 0 && codigoMfa.length < 6 && (
+              <span className={pwdStyles.codeHint}>Ingresa los 6 dígitos completos</span>
+            )}
+          </div>
+        </Field>
 
         <Button
           type="submit"
@@ -165,7 +154,7 @@ function CambiarPasswordModal({
           size="lg"
           style={{ width: '100%', marginTop: 4 }}
           icon={<Lock size={15} />}
-          disabled={!correo || !pwdActual || pwdNueva.length < 8}
+          disabled={!canSubmit}
         >
           Actualizar contraseña
         </Button>
@@ -176,12 +165,12 @@ function CambiarPasswordModal({
 
 // ─── Página de login ──────────────────────────────────────────────
 export default function Login() {
-  const [correo,   setCorreo]   = useState('');
-  const [password, setPassword] = useState('');
-  const [showPwd,  setShowPwd]  = useState(false);
+  const [correo,       setCorreo]       = useState('');
+  const [password,     setPassword]     = useState('');
+  const [showPwd,      setShowPwd]      = useState(false);
   const [showChangePwd, setShowChangePwd] = useState(false);
-  const { login } = useAuth();
-  const navigate  = useNavigate();
+  const { login }   = useAuth();
+  const navigate    = useNavigate();
 
   const [doLogin, { loading, error }] = useMutation(LOGIN, {
     onCompleted: ({ login: data }) => {
@@ -281,7 +270,6 @@ export default function Login() {
             </Button>
           </form>
 
-          {/* Cambiar contraseña */}
           <button
             className={styles.changePwdBtn}
             onClick={() => setShowChangePwd(true)}
@@ -296,7 +284,6 @@ export default function Login() {
         </div>
       </div>
 
-      {/* Modal de cambio de contraseña */}
       <CambiarPasswordModal
         open={showChangePwd}
         onClose={() => setShowChangePwd(false)}

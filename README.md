@@ -1,17 +1,12 @@
 # UniMente
 
-Portal de Bienestar Universitario — Sistema de gestión de atención psicológica que conecta estudiantes con psicólogos certificados de manera confidencial y segura.
+Portal de Bienestar Universitario — Sistema integral de gestión de atención psicológica que conecta estudiantes con psicólogos certificados de manera confidencial y segura.
 
 ---
 
 ## Descripción del sistema
 
-UniMente permite a los estudiantes universitarios acceder a servicios de salud mental de forma sencilla. El sistema cubre el ciclo completo: desde el agendamiento de una cita hasta el registro de sesiones clínicas y el mantenimiento del historial del paciente.
-
-**Roles del sistema:**
-- **Estudiante** — Busca psicólogos disponibles, agenda citas y consulta su historial
-- **Psicólogo** — Gestiona su disponibilidad semanal, registra sesiones y mantiene expedientes
-- **Administrador** — Registra y gestiona el equipo de psicólogos
+UniMente cubre el ciclo completo de atención psicológica universitaria: agendamiento de citas, registro de sesiones clínicas, mantenimiento de historial del paciente, sistema de respaldos de base de datos y autenticación de dos factores (MFA).
 
 ---
 
@@ -19,10 +14,12 @@ UniMente permite a los estudiantes universitarios acceder a servicios de salud m
 
 | Capa | Tecnología |
 |---|---|
-| Frontend | React 18 · TypeScript · Vite · Apollo Client · React Router |
-| Backend | NestJS · TypeORM · Apollo Server · Passport JWT |
+| Frontend | React 18 · TypeScript · Vite · Apollo Client · React Router · CSS Modules |
+| Backend | NestJS · TypeORM · Apollo Server · Passport JWT · @nestjs/schedule |
 | Base de datos | MySQL 8.0 |
 | Comunicación | GraphQL |
+| MFA | speakeasy (TOTP RFC 6238) · qrcode |
+| Backups | ExcelJS · mysql2 nativo |
 
 ---
 
@@ -55,14 +52,18 @@ git clone https://github.com/MonkyFlip/uni-mente.git
 cd uni-mente
 ```
 
-### 2. Configurar el backend
+### 2. Instalar dependencias del backend
 
 ```bash
 cd backend
-npm install
+npm install --legacy-peer-deps
+npm install speakeasy qrcode exceljs @nestjs/schedule --legacy-peer-deps
+npm install @types/speakeasy @types/qrcode --save-dev --legacy-peer-deps
 ```
 
-Crear el archivo `backend/.env`:
+### 3. Configurar variables de entorno del backend
+
+Crear `backend/.env`:
 
 ```env
 DB_HOST=localhost
@@ -75,17 +76,11 @@ JWT_SECRET=unimente_super_secret_2024
 JWT_EXPIRES=8h
 ```
 
-### 3. Configurar el frontend
+### 4. Instalar dependencias del frontend
 
 ```bash
 cd ../frontend
-npm install
-```
-
-Crear el archivo `frontend/.env` (opcional, ya apunta a `localhost:3000` por defecto):
-
-```env
-VITE_API_URL=http://localhost:3000/graphql
+npm install --legacy-peer-deps
 ```
 
 ---
@@ -121,16 +116,13 @@ Al levantar el backend por primera vez:
 3. Detecta que la BD está vacía y ejecuta el seed automáticamente
 4. Genera ~1 100 registros de prueba bien relacionados
 
-En consola verás:
-
+Salida esperada en consola:
 ```
 Base de datos inicializada correctamente.
 BD vacía — ejecutando seed de datos de prueba...
-  Iniciando seed de datos de prueba...
   Seed completado:
     Psicologos: 12  |  Horarios: 42  |  Estudiantes: 80
-    Citas: 451  |  Sesiones: 238  |  Historiales: 89
-  Acceso: psicologo1@unimente.edu / estudiante1@unimente.edu  →  Password123!
+    Citas: ~450  |  Sesiones: ~240  |  Historiales: ~90
 UniMente Backend corriendo en http://localhost:3000/graphql
 ```
 
@@ -138,11 +130,23 @@ UniMente Backend corriendo en http://localhost:3000/graphql
 
 ## Credenciales de acceso
 
+### Administradores del equipo
+
+| Nombre | Correo | Contraseña |
+|---|---|---|
+| Administrador (principal) | admin@unimente.edu | Admin1234! |
+| Brenda Admin | brendaAdmin@unimente.com | Brenda123! |
+| Abril Admin | abrilAdmin@unimente.com | Abril123! |
+| Mai Admin | maiAdmin@unimente.com | Mai123! |
+
+Los admins del equipo se agregan ejecutando el SQL en `generar_hashes_admin.js`. Cada admin puede configurar su propio MFA independiente desde `/admin/mfa`.
+
+### Datos de prueba (generados por el seed)
+
 | Rol | Correo | Contraseña |
 |---|---|---|
-| Administrador | admin@unimente.edu | Admin1234! |
-| Psicólogo | psicologo1@unimente.edu … psicologo12@unimente.edu | Password123! |
-| Estudiante | estudiante1@unimente.edu … estudiante80@unimente.edu | Password123! |
+| Psicólogos | psicologo1@unimente.edu … psicologo12@unimente.edu | Password123! |
+| Estudiantes | estudiante1@unimente.edu … estudiante80@unimente.edu | Password123! |
 
 ---
 
@@ -151,41 +155,45 @@ UniMente Backend corriendo en http://localhost:3000/graphql
 ```
 uni-mente/
 ├── backend/
+│   ├── Backup/                      # Archivos de respaldo (auto-creada)
 │   ├── src/
-│   │   ├── app.module.ts        # Init BD automático + seed al arrancar
+│   │   ├── app.module.ts            # Init BD + seed automático + ScheduleModule
 │   │   ├── database/
-│   │   │   └── init.sql         # CREATE TABLE IF NOT EXISTS (idempotente)
+│   │   │   └── init.sql             # CREATE IF NOT EXISTS + migración MFA
 │   │   ├── seed/
-│   │   │   └── seed.ts          # ~1 100 registros de prueba
-│   │   ├── auth/                # JWT login
-│   │   ├── common/              # Guards, decorators, enums
-│   │   ├── cita/                # Entidad, resolver, service
+│   │   │   └── seed.ts              # ~1 100 registros con admin real bcrypt
+│   │   ├── mfa/                     # TOTP con speakeasy + QR
+│   │   ├── backup/                  # SQL/JSON/CSV/Excel + scheduler automático
+│   │   ├── auth/
+│   │   ├── cita/
 │   │   ├── sesion/
 │   │   ├── historial-clinico/
 │   │   ├── psicologo/
 │   │   ├── estudiante/
 │   │   └── ...
-│   ├── .env                     # Variables de entorno (crear manualmente)
-│   └── package.json
+│   └── .env
 │
 ├── frontend/
 │   ├── src/
-│   │   ├── App.tsx              # Rutas + providers
-│   │   ├── apollo/client.ts     # Apollo con auth link y error link
-│   │   ├── auth/                # AuthContext, ProtectedRoute
-│   │   ├── components/          # UI, Layout, Sidebar, DatePicker, TimePicker
+│   │   ├── App.tsx                  # Rutas + providers + TourProvider
+│   │   ├── tours/                   # Guía interactiva por rol
+│   │   ├── components/
+│   │   │   └── UI.tsx               # Pagination + usePagination hook
 │   │   ├── graphql/
-│   │   │   └── operations.ts    # Todas las queries y mutations
+│   │   │   └── operations.ts        # Queries y mutations (MFA + Backup)
 │   │   └── pages/
-│   │       ├── admin/           # Gestión de psicólogos
-│   │       ├── estudiante/      # Buscar psicólogos, mis citas
-│   │       └── psicologo/       # Agenda, horarios
-│   ├── .env                     # (opcional)
-│   └── package.json
+│   │       ├── Login.tsx            # Login + cambio de contraseña con MFA
+│   │       ├── admin/
+│   │       │   ├── Backup.tsx       # Modal MFA para confirmar respaldos
+│   │       │   └── MfaConfig.tsx    # Activar/desactivar TOTP
+│   │       ├── estudiante/
+│   │       └── psicologo/
+│   └── .env
 │
-├── BACKEND.md                   # Documentación completa del backend
-├── FRONTEND.md                  # Documentación completa del frontend
-└── README.md                    # Este archivo
+├── generar_hashes_admin.js          # Script para generar INSERT de admins
+├── BACKEND.md
+├── FRONTEND.md
+└── README.md
 ```
 
 ---
@@ -195,94 +203,119 @@ uni-mente/
 ### Estudiante agenda una cita
 
 ```
-1. Login → /dashboard
-2. Ir a /psicologos
-3. Seleccionar psicólogo → "Agendar cita"
-4. Elegir horario disponible
-5. Seleccionar fecha (solo días del horario elegido)
-6. Escribir motivo (opcional)
-7. Confirmar → Cita creada con estado PENDIENTE
+1. Login → /dashboard (guía automática en primer acceso)
+2. /psicologos → buscar por nombre o especialidad
+3. Clic en "Agendar cita" → seleccionar horario → elegir fecha
+4. Solo se muestran fechas del día de la semana del horario elegido
+5. Motivo opcional → Confirmar → Cita PENDIENTE creada
 ```
 
 ### Psicólogo registra una sesión
 
 ```
 1. Login → /agenda
-2. Ver citas del día con estado PENDIENTE
-3. Clic en "Registrar sesión"
-4. Ingresar notas clínicas y recomendaciones
-5. Confirmar → (transacción única):
-   - Sesión guardada
-   - Cita marcada como ASISTIDA
-   - Historial clínico creado o actualizado
-   - Detalle vinculado al historial
+2. Ver citas PENDIENTE → clic en "Sesión"
+3. Llenar notas y recomendaciones → Guardar
+4. Backend en transacción única:
+   - INSERT Sesion
+   - UPDATE Cita SET estado = 'ASISTIDA'
+   - CREATE OR UPDATE Historial_Clinico
+   - INSERT Detalle_Historial
 ```
 
-### Administrador registra un psicólogo
+### Administrador crea un respaldo
 
 ```
-1. Login → /admin/psicologos
-2. Clic en "Registrar psicólogo"
-3. Ingresar nombre, correo, contraseña (obligatorios)
-4. Especialidad, cédula, teléfono (opcionales)
-5. Confirmar → Psicólogo listo para definir horarios
+1. Login → /admin/backup
+2. Seleccionar tipo (COMPLETO / DIFERENCIAL / INCREMENTAL)
+3. Seleccionar formato (SQL / JSON / EXCEL / CSV)
+4. Clic en "Crear respaldo" → modal de confirmación
+5. Ingresar código MFA de 6 dígitos (si está configurado)
+6. Backup creado en backend/Backup/
 ```
+
+### Administrador configura MFA
+
+```
+1. /admin/mfa → Clic en "Activar MFA"
+2. Escanear QR con Google Authenticator o Microsoft Authenticator
+3. Ingresar código de 6 dígitos para confirmar sincronización
+4. MFA activo — respaldos y restauraciones requerirán código
+```
+
+### Cambio de contraseña (desde Login)
+
+```
+1. Página /login → botón "Cambiar contraseña"
+2. Ingresar: correo + contraseña actual + nueva contraseña
+3. Ingresar código MFA de 6 dígitos (SIEMPRE obligatorio)
+4. Contraseña actualizada
+```
+
+---
+
+## Módulos adicionales
+
+### Guía interactiva del sistema
+
+Al iniciar sesión por primera vez, se activa automáticamente una guía visual que recorre todas las funcionalidades del portal según el rol del usuario. Incluye overlay con recorte sobre el elemento destacado, tooltip animado con barra de progreso y botón de saltar. El botón **"Guía del sistema"** en la barra lateral permite relanzarla en cualquier momento.
+
+### Paginación
+
+Todas las vistas con listas largas tienen paginación integrada. El componente `Pagination` muestra el rango de registros, botones de navegación y números de página con puntos suspensivos. Al filtrar o buscar, la lista regresa automáticamente a la página 1.
+
+### Sistema de respaldos
+
+Soporta tres tipos (Completo, Diferencial, Incremental) en cuatro formatos (SQL, JSON, Excel, CSV). Se mantienen solo los 3 respaldos más recientes — los anteriores se eliminan automáticamente. El backup automático puede configurarse con una frecuencia desde 1 hora hasta 30 días, y ejecuta un respaldo de seguridad inmediatamente al ser configurado.
 
 ---
 
 ## Decisiones técnicas destacadas
 
-### `estado` como VARCHAR en lugar de ENUM
+### `estado` como VARCHAR en Cita
 
-La columna `Cita.estado` se almacena como `VARCHAR(20)` en MySQL en lugar de `ENUM`. TypeORM tiene un bug documentado donde el mapeo de columnas `ENUM` puede devolver el valor vacío en memoria después de un `save()`. Combinado con `@Field(() => EstadoCita)` en NestJS GraphQL, esto produce el error `Enum "EstadoCita" cannot represent value: ""`.
+La columna `Cita.estado` es `VARCHAR(20)` en MySQL, no `ENUM`. TypeORM tiene un bug donde el mapeo de columnas ENUM puede devolver valores vacíos después de un raw SQL update. Combined con `@Field(() => EstadoCita)` en NestJS GraphQL produce `Enum "EstadoCita" cannot represent value: ""`. La solución usa `VARCHAR` en BD, `string` en TypeORM, `@Field()` sin tipo explícito en el output, y SQL directo para escrituras.
 
-La solución usa tres cambios coordinados: `VARCHAR` en la BD, `string` en TypeORM, y `@Field()` (String) en el output de GraphQL. El enum `EstadoCita` se mantiene únicamente para validar los inputs.
+### MFA siempre requerido en cambio de contraseña
 
-### Raw SQL para escrituras de estado
+El modal de cambio de contraseña no tiene opción de omitir el código MFA. Esto previene que alguien con acceso físico al dispositivo o conocimiento de la contraseña actual pueda cambiarla sin autorización del dueño de la cuenta.
 
-Cualquier actualización del campo `estado` usa SQL directo:
-```typescript
-await this.dataSource.query('UPDATE Cita SET estado = ? WHERE id_cita = ?', [valor, id]);
-```
-Esto garantiza que el valor llega a MySQL sin ninguna transformación del ORM.
+### Seed con admin de bcrypt real
 
-### Campos opcionales nunca se envían como `""`
-
-Los formularios del frontend usan funciones `strip()` y `clean()` que convierten las cadenas vacías a `undefined` antes de enviar las mutations. De esta forma el backend recibe `null` para guardar `NULL` en MySQL, en lugar de guardar `""`.
-
-### IDs de perfil resueltos en el backend
-
-Los IDs `id_estudiante` e `id_psicologo` nunca vienen del cliente. Siempre se extraen del JWT en el backend, lo que garantiza que un usuario no puede manipular datos de otro.
-
-### Inicialización automática de BD y seed
-
-Al ejecutar `nest start`, el backend crea la BD, las tablas y los datos de prueba automáticamente. No hay pasos manuales de migración.
+El `init.sql` ya no incluye un hash hardcodeado del admin. El seed genera el hash con `bcrypt.hash('Admin1234!', 10)` en runtime, garantizando que el hash siempre coincide con la contraseña real.
 
 ---
 
 ## Documentación completa
 
-- [BACKEND.md](./BACKEND.md) — Arquitectura, API GraphQL, decisiones técnicas del backend
-- [FRONTEND.md](./FRONTEND.md) — Componentes, rutas, Apollo Client, bugs resueltos del frontend
+- [BACKEND.md](./BACKEND.md) — Arquitectura, API GraphQL, MFA, sistema de respaldos, bugs resueltos
+- [FRONTEND.md](./FRONTEND.md) — Componentes, rutas, tour, paginación, decisiones técnicas
 
 ---
 
 ## Comandos de referencia rápida
 
 ```bash
-# Clonar
+# Clonar e instalar
 git clone https://github.com/MonkyFlip/uni-mente.git
+cd uni-mente/backend  && npm install --legacy-peer-deps
+cd ../frontend        && npm install --legacy-peer-deps
 
-# Instalar dependencias (backend y frontend)
-cd uni-mente/backend  && npm install
-cd ../frontend        && npm install
+# Paquetes adicionales del backend
+cd ../backend
+npm install speakeasy qrcode exceljs @nestjs/schedule --legacy-peer-deps
 
-# Levantar todo
-cd ../backend  && npm run start:dev   # Terminal 1
-cd ../frontend && npm run dev         # Terminal 2
+# Levantar
+cd backend  && npm run start:dev   # Terminal 1
+cd frontend && npm run dev         # Terminal 2
 
-# Reiniciar datos de prueba (backend)
+# Reiniciar datos de prueba
 cd backend
-npm run seed           # macOS / Linux
+npm run seed                                              # macOS / Linux
 npx ts-node -r tsconfig-paths/register src\seed\seed.ts  # Windows
+
+# Agregar admins del equipo (genera SQL con hashes reales)
+cd backend
+node generar_hashes_admin.js
+# → copiar los INSERT y ejecutar en MySQL
 ```

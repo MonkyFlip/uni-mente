@@ -2,7 +2,8 @@ import {
   createContext, useContext, useState, useCallback,
   useEffect, ReactNode,
 } from 'react';
-import { TOUR_STEPS, TourStep } from './tourSteps';
+import { TOUR_STEPS } from './tourSteps';
+import type { TourStep } from './tourSteps';
 
 interface TourContextType {
   active:    boolean;

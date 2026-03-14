@@ -2,10 +2,16 @@ import { useState } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
 import { CalendarCheck, UserCheck, XCircle, PenLine, Search, AlertTriangle } from 'lucide-react';
 import { Layout } from '../../components/Layout';
-import { PageHeader, Badge, Button, EmptyState, Spinner, Alert, Modal, Field } from '../../components/UI';
+import {
+  PageHeader, Badge, Button, EmptyState, Spinner,
+  Alert, Modal, Field, Pagination, usePagination,
+} from '../../components/UI';
 import { GET_AGENDA_PSICOLOGO, CAMBIAR_ESTADO_CITA, REGISTRAR_SESION } from '../../graphql/operations';
 import { useAuth } from '../../auth/AuthContext';
 import styles from './Agenda.module.css';
+
+const PAGE_SIZE_PENDIENTES = 8;
+const PAGE_SIZE_HISTORIAL  = 10;
 
 const ESTADO_BADGE: Record<string, 'yellow' | 'green' | 'red'> = {
   PENDIENTE: 'yellow', ASISTIDA: 'green', CANCELADA: 'red',
@@ -39,17 +45,25 @@ export default function Agenda() {
 
   const citas: any[] = data?.agendaPsicologo ?? [];
 
+  // Filtrado por búsqueda
   const filtradas = citas.filter((c: any) =>
     c.estudiante?.usuario?.nombre?.toLowerCase().includes(search.toLowerCase()) ||
-    c.motivo?.toLowerCase().includes(search.toLowerCase())
+    (c.motivo ?? '').toLowerCase().includes(search.toLowerCase())
   );
 
   const pendientes = filtradas.filter((c: any) => c.estado === 'PENDIENTE');
   const historial  = filtradas.filter((c: any) => c.estado !== 'PENDIENTE');
 
+  // Paginación independiente para cada sección
+  const pgPend = usePagination(pendientes, PAGE_SIZE_PENDIENTES);
+  const pgHist = usePagination(historial,  PAGE_SIZE_HISTORIAL);
+
   return (
     <Layout>
-      <PageHeader title="Mi Agenda" subtitle="Gestiona tus citas y registra sesiones" />
+      <PageHeader
+        title="Mi Agenda"
+        subtitle={`${citas.length} cita${citas.length !== 1 ? 's' : ''} en total`}
+      />
 
       {!idPsicologo && <Alert message="No se encontró tu perfil. Vuelve a iniciar sesión." />}
       {loading && <div style={{ display: 'flex', justifyContent: 'center', padding: 64 }}><Spinner size={36} /></div>}
@@ -58,47 +72,79 @@ export default function Agenda() {
       {citas.length > 0 && (
         <div className={styles.searchBar}>
           <Search size={15} className={styles.searchIcon} />
-          <input className={styles.searchInput} placeholder="Buscar por paciente o motivo..."
-            value={search} onChange={e => setSearch(e.target.value)} />
+          <input
+            className={styles.searchInput}
+            placeholder="Buscar por paciente o motivo..."
+            value={search}
+            onChange={e => { setSearch(e.target.value); pgPend.setPage(1); pgHist.setPage(1); }}
+          />
         </div>
       )}
 
+      {/* Sección: Próximas citas */}
       {pendientes.length > 0 && (
         <section className={styles.section}>
           <h3 className={styles.sectionTitle}>
             Próximas citas <span className={styles.count}>{pendientes.length}</span>
           </h3>
           <div className={`${styles.list} stagger`}>
-            {pendientes.map((cita: any) => (
-              <CitaRow key={cita.id_cita} cita={cita}
-                onSesion={() => { setSelectedCita(cita); setSesionForm({ notas: '', recomendaciones: '', numero_sesion: 1 }); }}
+            {pgPend.slice.map((cita: any) => (
+              <CitaRow
+                key={cita.id_cita}
+                cita={cita}
+                onSesion={() => {
+                  setSelectedCita(cita);
+                  setSesionForm({ notas: '', recomendaciones: '', numero_sesion: 1 });
+                }}
                 onAsistida={() => setConfirmAsistida(cita)}
                 onCancelar={() => setConfirmCancelar(cita)}
               />
             ))}
           </div>
+          <Pagination
+            total={pgPend.total}
+            page={pgPend.page}
+            pageSize={PAGE_SIZE_PENDIENTES}
+            onChange={pgPend.setPage}
+          />
         </section>
       )}
 
+      {/* Sección: Historial */}
       {historial.length > 0 && (
         <section className={styles.section}>
-          <h3 className={styles.sectionTitle}>Historial</h3>
+          <h3 className={styles.sectionTitle}>
+            Historial <span className={styles.count}>{historial.length}</span>
+          </h3>
           <div className={`${styles.list} stagger`}>
-            {historial.map((cita: any) => <CitaRow key={cita.id_cita} cita={cita} />)}
+            {pgHist.slice.map((cita: any) => (
+              <CitaRow key={cita.id_cita} cita={cita} />
+            ))}
           </div>
+          <Pagination
+            total={pgHist.total}
+            page={pgHist.page}
+            pageSize={PAGE_SIZE_HISTORIAL}
+            onChange={pgHist.setPage}
+          />
         </section>
       )}
 
       {!loading && idPsicologo && citas.length === 0 && (
-        <EmptyState icon={<CalendarCheck size={28} />} title="Sin citas registradas"
-          description="Las citas aparecerán aquí cuando los estudiantes las agenden." />
+        <EmptyState
+          icon={<CalendarCheck size={28} />}
+          title="Sin citas registradas"
+          description="Las citas aparecerán aquí cuando los estudiantes las agenden."
+        />
       )}
 
       {/* Modal: confirmar asistida */}
       <Modal open={!!confirmAsistida} onClose={() => setConfirmAsistida(null)} title="Confirmar asistencia">
         <p style={{ color: 'var(--cream-dim)', fontSize: 14, lineHeight: 1.6 }}>
-          ¿Confirmas que <strong style={{ color: 'var(--cream)' }}>{confirmAsistida?.estudiante?.usuario?.nombre}</strong>{' '}
-          asistió el <strong style={{ color: 'var(--cream)' }}>
+          ¿Confirmas que{' '}
+          <strong style={{ color: 'var(--cream)' }}>{confirmAsistida?.estudiante?.usuario?.nombre}</strong>{' '}
+          asistió el{' '}
+          <strong style={{ color: 'var(--cream)' }}>
             {confirmAsistida && new Date(confirmAsistida.fecha + 'T12:00:00').toLocaleDateString('es-MX', {
               weekday: 'long', day: 'numeric', month: 'long',
             })}
@@ -110,7 +156,9 @@ export default function Agenda() {
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 16 }}>
           <Button variant="secondary" onClick={() => setConfirmAsistida(null)}>Cancelar</Button>
           <Button variant="primary" loading={cambiando} icon={<UserCheck size={14} />}
-            onClick={() => cambiarEstado({ variables: { id_cita: confirmAsistida.id_cita, input: { estado: 'ASISTIDA' } } })}>
+            onClick={() => cambiarEstado({
+              variables: { id_cita: confirmAsistida.id_cita, input: { estado: 'ASISTIDA' } },
+            })}>
             Confirmar asistencia
           </Button>
         </div>
@@ -121,18 +169,23 @@ export default function Agenda() {
         <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 12 }}>
           <AlertTriangle size={18} style={{ color: '#f87171', flexShrink: 0, marginTop: 2 }} />
           <p style={{ color: 'var(--cream-dim)', fontSize: 14, lineHeight: 1.6, margin: 0 }}>
-            ¿Cancelar la cita de <strong style={{ color: 'var(--cream)' }}>{confirmCancelar?.estudiante?.usuario?.nombre}</strong>{' '}
-            del <strong style={{ color: 'var(--cream)' }}>
+            ¿Cancelar la cita de{' '}
+            <strong style={{ color: 'var(--cream)' }}>{confirmCancelar?.estudiante?.usuario?.nombre}</strong>{' '}
+            del{' '}
+            <strong style={{ color: 'var(--cream)' }}>
               {confirmCancelar && new Date(confirmCancelar.fecha + 'T12:00:00').toLocaleDateString('es-MX', {
                 weekday: 'long', day: 'numeric', month: 'long',
               })}
-            </strong>? Esta acción no se puede deshacer.
+            </strong>?
+            Esta acción no se puede deshacer.
           </p>
         </div>
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
           <Button variant="secondary" onClick={() => setConfirmCancelar(null)}>Mantener cita</Button>
           <Button variant="danger" loading={cambiando} icon={<XCircle size={14} />}
-            onClick={() => cambiarEstado({ variables: { id_cita: confirmCancelar.id_cita, input: { estado: 'CANCELADA' } } })}>
+            onClick={() => cambiarEstado({
+              variables: { id_cita: confirmCancelar.id_cita, input: { estado: 'CANCELADA' } },
+            })}>
             Sí, cancelar
           </Button>
         </div>
@@ -149,15 +202,18 @@ export default function Agenda() {
             })}{' '}· {selectedCita?.hora_inicio?.slice(0, 5)}
           </span>
         </div>
-        <form onSubmit={e => {
-          e.preventDefault();
-          registrarSesion({ variables: { input: {
-            id_cita: selectedCita.id_cita,
-            numero_sesion: sesionForm.numero_sesion,
-            notas: sesionForm.notas || undefined,
-            recomendaciones: sesionForm.recomendaciones || undefined,
-          }}});
-        }} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <form
+          onSubmit={e => {
+            e.preventDefault();
+            registrarSesion({ variables: { input: {
+              id_cita:         selectedCita.id_cita,
+              numero_sesion:   sesionForm.numero_sesion,
+              notas:           sesionForm.notas           || undefined,
+              recomendaciones: sesionForm.recomendaciones || undefined,
+            }}});
+          }}
+          style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
+        >
           <Field label="Número de sesión">
             <input type="number" min={1} value={sesionForm.numero_sesion}
               onChange={e => setSesionForm(f => ({ ...f, numero_sesion: +e.target.value }))} required />
@@ -202,9 +258,9 @@ function CitaRow({ cita, onAsistida, onCancelar, onSesion }: any) {
         <Badge label={LABEL[cita.estado] ?? cita.estado} variant={ESTADO_BADGE[cita.estado] ?? 'gray'} />
         {cita.estado === 'PENDIENTE' && (
           <>
-            <Button variant="primary"   size="sm" icon={<PenLine size={13} />}   onClick={onSesion}>Sesión</Button>
+            <Button variant="primary"   size="sm" icon={<PenLine   size={13} />} onClick={onSesion}>Sesión</Button>
             <Button variant="secondary" size="sm" icon={<UserCheck size={13} />} onClick={onAsistida}>Asistida</Button>
-            <Button variant="danger"    size="sm" icon={<XCircle size={13} />}   onClick={onCancelar}>Cancelar</Button>
+            <Button variant="danger"    size="sm" icon={<XCircle   size={13} />} onClick={onCancelar}>Cancelar</Button>
           </>
         )}
       </div>

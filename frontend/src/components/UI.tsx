@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 import { Loader2, AlertCircle, CheckCircle2, X } from 'lucide-react';
 import styles from './UI.module.css';
 
@@ -114,4 +114,87 @@ export function StatCard({ icon, label, value }: { icon: ReactNode; label: strin
       </div>
     </div>
   );
+}
+
+// ── Pagination ───────────────────────────────────────────────────────────────
+interface PaginationProps {
+  total:    number;
+  page:     number;
+  pageSize: number;
+  onChange: (page: number) => void;
+}
+
+export function Pagination({ total, page, pageSize, onChange }: PaginationProps) {
+  const totalPages = Math.ceil(total / pageSize);
+  if (totalPages <= 1) return null;
+
+  const from = (page - 1) * pageSize + 1;
+  const to   = Math.min(page * pageSize, total);
+
+  // Build page window: always show first, last, current ± 1, with ellipsis
+  const pages: (number | '…')[] = [];
+  const add = (n: number) => { if (!pages.includes(n)) pages.push(n); };
+
+  add(1);
+  if (page > 3) pages.push('…');
+  for (let i = Math.max(2, page - 1); i <= Math.min(totalPages - 1, page + 1); i++) add(i);
+  if (page < totalPages - 2) pages.push('…');
+  if (totalPages > 1) add(totalPages);
+
+  return (
+    <div className={styles.pagination}>
+      <span className={styles.paginationInfo}>
+        {from}–{to} de {total}
+      </span>
+      <div className={styles.paginationPages}>
+        <button
+          className={styles.pageBtn}
+          onClick={() => onChange(page - 1)}
+          disabled={page === 1}
+          aria-label="Página anterior"
+        >
+          ‹
+        </button>
+        {pages.map((p, i) =>
+          p === '…' ? (
+            <span key={`e${i}`} className={styles.pageEllipsis}>…</span>
+          ) : (
+            <button
+              key={p}
+              className={`${styles.pageBtn} ${p === page ? styles.pageBtnActive : ''}`}
+              onClick={() => onChange(p as number)}
+            >
+              {p}
+            </button>
+          )
+        )}
+        <button
+          className={styles.pageBtn}
+          onClick={() => onChange(page + 1)}
+          disabled={page === totalPages}
+          aria-label="Página siguiente"
+        >
+          ›
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── usePagination hook ───────────────────────────────────────────────────────
+export function usePagination<T>(items: T[], pageSize = 9) {
+  const [page, setPage] = useState(1);
+
+  // Reset to page 1 whenever the list changes (e.g. after a search filter)
+  const total    = items.length;
+  const safePage = Math.min(page, Math.max(1, Math.ceil(total / pageSize)));
+
+  const slice = items.slice((safePage - 1) * pageSize, safePage * pageSize);
+
+  const changePage = (p: number) => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setPage(p);
+  };
+
+  return { page: safePage, setPage: changePage, slice, total, pageSize };
 }

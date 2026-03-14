@@ -2,11 +2,16 @@ import { useState, useMemo } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
 import { Search, Calendar, Clock, User, Stethoscope, CheckCircle2 } from 'lucide-react';
 import { Layout } from '../../components/Layout';
-import { PageHeader, Card, Button, EmptyState, Spinner, Modal, Field, Alert, Badge } from '../../components/UI';
+import {
+  PageHeader, Card, Button, EmptyState, Spinner,
+  Modal, Field, Alert, Badge, Pagination, usePagination,
+} from '../../components/UI';
 import { DatePicker } from '../../components/DatePicker';
 import { GET_PSICOLOGOS, AGENDAR_CITA } from '../../graphql/operations';
 import { useAuth } from '../../auth/AuthContext';
 import styles from './Psicologos.module.css';
+
+const PAGE_SIZE = 6;
 
 const DIAS_ES: Record<string, string> = {
   lunes: 'Lunes', martes: 'Martes', miercoles: 'Miércoles',
@@ -39,12 +44,12 @@ export default function Psicologos() {
   const { user } = useAuth();
   const { data, loading } = useQuery(GET_PSICOLOGOS);
 
-  const [selected,    setSelected]    = useState<any>(null);
-  const [horarioSel,  setHorarioSel]  = useState<any>(null);
-  const [fecha,       setFecha]       = useState('');
-  const [motivo,      setMotivo]      = useState('');
-  const [searchVal,   setSearchVal]   = useState('');
-  const [success,     setSuccess]     = useState('');
+  const [selected,   setSelected]   = useState<any>(null);
+  const [horarioSel, setHorarioSel] = useState<any>(null);
+  const [fecha,      setFecha]      = useState('');
+  const [motivo,     setMotivo]     = useState('');
+  const [searchVal,  setSearchVal]  = useState('');
+  const [success,    setSuccess]    = useState('');
 
   const [agendar, { loading: agendando, error: errorAgendar }] = useMutation(AGENDAR_CITA, {
     onCompleted: () => {
@@ -56,15 +61,22 @@ export default function Psicologos() {
     },
   });
 
-  const psicologos = useMemo(() =>
+  // Filtrado por búsqueda
+  const filtrados = useMemo(() =>
     (data?.psicologos ?? []).filter((p: any) =>
       p.usuario.nombre.toLowerCase().includes(searchVal.toLowerCase()) ||
       (p.especialidad ?? '').toLowerCase().includes(searchVal.toLowerCase())
-    ), [data, searchVal]);
+    ),
+    [data, searchVal]
+  );
+
+  // Paginación
+  const { page, setPage, slice: pagina, total } = usePagination(filtrados, PAGE_SIZE);
 
   const horariosDisponibles = useMemo(() =>
     (selected?.horarios ?? []).filter((h: any) => h.disponible),
-    [selected]);
+    [selected]
+  );
 
   const openModal = (p: any) => {
     setSelected(p); setHorarioSel(null);
@@ -85,8 +97,6 @@ export default function Psicologos() {
     e.preventDefault();
     if (!horarioSel || !fecha) return;
     if (!fechaValidaParaDia(fecha, horarioSel.dia_semana)) return;
-
-    // id_horario y id_psicologo son requeridos — no pueden ser 0 o undefined
     if (!selected?.id_psicologo || !horarioSel?.id_horario) return;
 
     const input: Record<string, any> = {
@@ -94,15 +104,16 @@ export default function Psicologos() {
       id_horario:   horarioSel.id_horario,
       fecha,
     };
-    // motivo es opcional — solo incluirlo si tiene contenido real
     if (motivo.trim()) input.motivo = motivo.trim();
-
     agendar({ variables: { input } });
   };
 
   return (
     <Layout>
-      <PageHeader title="Psicólogos" subtitle="Encuentra el profesional adecuado para ti" />
+      <PageHeader
+        title="Psicólogos"
+        subtitle={`${total} profesional${total !== 1 ? 'es' : ''} disponible${total !== 1 ? 's' : ''}`}
+      />
 
       <div className={styles.searchBar}>
         <Search size={16} className={styles.searchIcon} />
@@ -110,7 +121,7 @@ export default function Psicologos() {
           className={styles.searchInput}
           placeholder="Buscar por nombre o especialidad..."
           value={searchVal}
-          onChange={e => setSearchVal(e.target.value)}
+          onChange={e => { setSearchVal(e.target.value); setPage(1); }}
         />
       </div>
 
@@ -120,13 +131,16 @@ export default function Psicologos() {
         </div>
       )}
 
-      {!loading && psicologos.length === 0 && (
-        <EmptyState icon={<User size={28} />} title="Sin psicólogos"
-          description="No se encontraron psicólogos registrados." />
+      {!loading && filtrados.length === 0 && (
+        <EmptyState
+          icon={<User size={28} />}
+          title="Sin psicólogos"
+          description={searchVal ? 'Ningún psicólogo coincide con la búsqueda.' : 'No hay psicólogos registrados.'}
+        />
       )}
 
       <div className={`${styles.grid} stagger`}>
-        {psicologos.map((p: any) => {
+        {pagina.map((p: any) => {
           const disponibles = (p.horarios ?? []).filter((h: any) => h.disponible);
           return (
             <Card key={p.id_psicologo} hoverable className={styles.card}>
@@ -176,13 +190,16 @@ export default function Psicologos() {
         })}
       </div>
 
+      <Pagination total={total} page={page} pageSize={PAGE_SIZE} onChange={setPage} />
+
+      {/* Modal de agendamiento */}
       <Modal
         open={!!selected}
         onClose={() => setSelected(null)}
         title={`Agendar con ${selected?.usuario?.nombre ?? ''}`}
       >
-        {success      && <Alert message={success} type="success" />}
-        {errorAgendar && <Alert message={errorAgendar.message.replace('GraphQL error: ', '')} />}
+        {success       && <Alert message={success} type="success" />}
+        {errorAgendar  && <Alert message={errorAgendar.message.replace('GraphQL error: ', '')} />}
 
         <form onSubmit={handleAgendar} className={styles.modalForm}>
 
@@ -250,7 +267,7 @@ export default function Psicologos() {
             </>
           )}
 
-          {/* Paso 3: Motivo opcional */}
+          {/* Paso 3: Motivo (opcional) */}
           {horarioSel && fecha && (
             <>
               <div className={styles.stepLabel}>

@@ -3,8 +3,8 @@ import { useQuery, useMutation } from '@apollo/client';
 import {
   Database, Download, RotateCcw, Settings, Clock,
   FileText, FileJson, FileSpreadsheet, File,
-  Layers, GitBranch, GitCommit, Play, Trash2,
-  CheckCircle2, AlertTriangle,
+  Layers, GitBranch, GitCommit, Play,
+  CheckCircle2, AlertTriangle, ShieldCheck,
 } from 'lucide-react';
 import { Layout } from '../../components/Layout';
 import { PageHeader, Card, Button, Alert, Field, Badge, Modal } from '../../components/UI';
@@ -25,10 +25,10 @@ const TIPO_ICON: Record<string, React.ReactNode> = {
 };
 
 const FORMATO_ICON: Record<string, React.ReactNode> = {
-  SQL:   <FileText       size={13} />,
-  JSON:  <FileJson       size={13} />,
+  SQL:   <FileText        size={13} />,
+  JSON:  <FileJson        size={13} />,
   EXCEL: <FileSpreadsheet size={13} />,
-  CSV:   <File           size={13} />,
+  CSV:   <File            size={13} />,
 };
 
 const TIPO_DESC: Record<string, string> = {
@@ -47,61 +47,79 @@ function fmtDate(d: string | Date) {
 
 function fmtKb(kb: number | null) {
   if (!kb) return '—';
-  if (kb < 1024) return `${kb} KB`;
-  return `${(kb / 1024).toFixed(1)} MB`;
+  return kb < 1024 ? `${kb} KB` : `${(kb / 1024).toFixed(1)} MB`;
 }
 
 export default function Backup() {
-  const { data: dataBackups,  loading: lB, refetch: rB } = useQuery(GET_BACKUPS,        { fetchPolicy: 'network-only' });
-  const { data: dataConfig,   loading: lC, refetch: rC } = useQuery(GET_BACKUP_CONFIG,  { fetchPolicy: 'network-only' });
+  const { data: dataBackups, loading: lB, refetch: rB } = useQuery(GET_BACKUPS,       { fetchPolicy: 'network-only' });
+  const { data: dataConfig,  loading: lC, refetch: rC } = useQuery(GET_BACKUP_CONFIG, { fetchPolicy: 'network-only' });
 
   const backups: any[] = dataBackups?.listarBackups ?? [];
   const config: any    = dataConfig?.configBackupAutomatico ?? null;
 
-  // Manual backup state
+  // ── Selección de tipo y formato ───────────────────────────────
   const [manTipo,    setManTipo]    = useState<string>('COMPLETO');
   const [manFormato, setManFormato] = useState<string>('SQL');
-  const [manMfa,     setManMfa]     = useState('');
-  const [successMsg, setSuccessMsg] = useState('');
 
-  // Auto config state
+  // ── Modal: confirmar backup con MFA ───────────────────────────
+  const [showConfirmBackup, setShowConfirmBackup] = useState(false);
+  const [confirmMfa,        setConfirmMfa]        = useState('');
+
+  // ── Modal: configuración automática ──────────────────────────
+  const [showAuto,    setShowAuto]    = useState(false);
   const [autoTipo,    setAutoTipo]    = useState<string>(config?.tipo    ?? 'COMPLETO');
   const [autoFormato, setAutoFormato] = useState<string>(config?.formato ?? 'SQL');
   const [autoHoras,   setAutoHoras]   = useState<number>(config?.frecuencia_horas ?? 24);
   const [autoMfa,     setAutoMfa]     = useState('');
-  const [showAuto,    setShowAuto]    = useState(false);
 
-  // Restore state
+  // ── Modal: restaurar ─────────────────────────────────────────
   const [restoreTarget, setRestoreTarget] = useState<any>(null);
   const [restoreMfa,    setRestoreMfa]    = useState('');
 
+  const [successMsg, setSuccessMsg] = useState('');
   const ok = (msg: string) => { setSuccessMsg(msg); setTimeout(() => setSuccessMsg(''), 5000); };
 
+  // ── Mutations ─────────────────────────────────────────────────
   const [crearBackup, { loading: creating, error: errCreate }] = useMutation(CREAR_BACKUP, {
     onCompleted: (d) => {
       ok(`Backup creado: ${d.crearBackup.nombre_archivo} (${fmtKb(d.crearBackup.tamanio_kb)})`);
-      setManMfa(''); rB();
+      setShowConfirmBackup(false);
+      setConfirmMfa('');
+      rB();
     },
   });
 
   const [restaurarBackup, { loading: restoring, error: errRestore }] = useMutation(RESTAURAR_BACKUP, {
     onCompleted: () => {
       ok('Base de datos restaurada correctamente.');
-      setRestoreTarget(null); setRestoreMfa(''); rB();
+      setRestoreTarget(null);
+      setRestoreMfa('');
+      rB();
     },
   });
 
   const [configurarAuto, { loading: configuring, error: errConfig }] = useMutation(CONFIGURAR_BACKUP_AUTO, {
     onCompleted: () => {
       ok('Backup automático configurado. Se ejecutó un respaldo inicial de seguridad.');
-      setShowAuto(false); setAutoMfa(''); rC(); rB();
+      setShowAuto(false);
+      setAutoMfa('');
+      rC();
+      rB();
     },
   });
 
-  const handleManual = (e: React.FormEvent) => {
-    e.preventDefault();
+  // ── Handlers ──────────────────────────────────────────────────
+
+  /** El botón de crear abre el modal de confirmación MFA */
+  const handleClickCrear = () => {
+    setConfirmMfa('');
+    setShowConfirmBackup(true);
+  };
+
+  /** Confirmación desde el modal */
+  const handleConfirmBackup = () => {
     const input: any = { tipo: manTipo, formato: manFormato };
-    if (manMfa.trim()) input.codigo_mfa = manMfa.trim();
+    if (confirmMfa.trim()) input.codigo_mfa = confirmMfa.trim();
     crearBackup({ variables: { input } });
   };
 
@@ -122,73 +140,66 @@ export default function Backup() {
 
   return (
     <Layout>
-      <PageHeader
-        title="Respaldos"
-        subtitle="Gestiona los respaldos de la base de datos"
-      />
+      <PageHeader title="Respaldos" subtitle="Gestiona los respaldos de la base de datos" />
 
       {successMsg && <div style={{ marginBottom: 20 }}><Alert message={successMsg} type="success" /></div>}
 
       <div className={styles.layout}>
 
-        {/* ── Left: Backups list ─────────────────────────────── */}
+        {/* ── Columna principal ─────────────────────────────── */}
         <div className={styles.mainCol}>
 
-          {/* Manual backup form */}
+          {/* Formulario de selección */}
           <Card className={styles.formCard}>
             <div className={styles.cardHead}>
               <Database size={16} style={{ color: 'var(--teal)' }} />
               <span>Crear respaldo manual</span>
             </div>
-            {errCreate && <Alert message={errCreate.message.replace('GraphQL error: ', '')} />}
 
-            <form onSubmit={handleManual} className={styles.backupForm}>
-              <div className={styles.typeGrid}>
-                {TIPOS.map(t => (
-                  <button
-                    key={t} type="button"
-                    className={`${styles.typeBtn} ${manTipo === t ? styles.typeBtnActive : ''}`}
-                    onClick={() => setManTipo(t)}
-                  >
-                    {TIPO_ICON[t]}
-                    <div>
-                      <div className={styles.typeName}>{t}</div>
-                      <div className={styles.typeDesc}>{TIPO_DESC[t]}</div>
-                    </div>
-                  </button>
-                ))}
-              </div>
+            {/* Tipo */}
+            <div className={styles.typeGrid}>
+              {TIPOS.map(t => (
+                <button
+                  key={t} type="button"
+                  className={`${styles.typeBtn} ${manTipo === t ? styles.typeBtnActive : ''}`}
+                  onClick={() => setManTipo(t)}
+                >
+                  {TIPO_ICON[t]}
+                  <div>
+                    <div className={styles.typeName}>{t}</div>
+                    <div className={styles.typeDesc}>{TIPO_DESC[t]}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
 
-              <div className={styles.formatRow}>
-                {FORMATOS.map(f => (
-                  <button
-                    key={f} type="button"
-                    className={`${styles.fmtBtn} ${manFormato === f ? styles.fmtBtnActive : ''}`}
-                    onClick={() => setManFormato(f)}
-                  >
-                    {FORMATO_ICON[f]}
-                    <span>{f}</span>
-                  </button>
-                ))}
-              </div>
+            {/* Formato */}
+            <div className={styles.formatRow}>
+              {FORMATOS.map(f => (
+                <button
+                  key={f} type="button"
+                  className={`${styles.fmtBtn} ${manFormato === f ? styles.fmtBtnActive : ''}`}
+                  onClick={() => setManFormato(f)}
+                >
+                  {FORMATO_ICON[f]}
+                  <span>{f}</span>
+                </button>
+              ))}
+            </div>
 
-              <Field label="Código MFA (si está configurado)">
-                <input
-                  type="text" inputMode="numeric" maxLength={6}
-                  value={manMfa}
-                  onChange={e => setManMfa(e.target.value.replace(/\D/g, ''))}
-                  placeholder="123456 (opcional)"
-                  className={styles.mfaInput}
-                />
-              </Field>
-
-              <Button type="submit" loading={creating} icon={<Download size={15} />}>
+            {/* Botón — abre modal de confirmación MFA */}
+            <div className={styles.createBtn}>
+              <Button
+                style={{ width: '100%' }}
+                icon={<Download size={15} />}
+                onClick={handleClickCrear}
+              >
                 Crear respaldo {manTipo} en {manFormato}
               </Button>
-            </form>
+            </div>
           </Card>
 
-          {/* Backups list */}
+          {/* Lista de backups */}
           <Card>
             <div className={styles.cardHead}>
               <Database size={16} style={{ color: 'var(--teal)' }} />
@@ -206,9 +217,7 @@ export default function Backup() {
             <div className={styles.backupList}>
               {backups.map((b: any) => (
                 <div key={b.id_backup} className={styles.backupItem}>
-                  <div className={styles.backupIcon}>
-                    {TIPO_ICON[b.tipo]}
-                  </div>
+                  <div className={styles.backupIcon}>{TIPO_ICON[b.tipo]}</div>
                   <div className={styles.backupInfo}>
                     <div className={styles.backupName}>{b.nombre_archivo}</div>
                     <div className={styles.backupMeta}>
@@ -232,7 +241,7 @@ export default function Backup() {
           </Card>
         </div>
 
-        {/* ── Right: Auto config ─────────────────────────────── */}
+        {/* ── Columna lateral ───────────────────────────────── */}
         <div className={styles.sideCol}>
           <Card className={styles.autoCard}>
             <div className={styles.cardHead}>
@@ -246,18 +255,10 @@ export default function Backup() {
                   <CheckCircle2 size={14} style={{ color: 'var(--teal)' }} />
                   <span>Configurado</span>
                 </div>
-                <div className={styles.configDetail}>
-                  Tipo: <strong>{config.tipo}</strong>
-                </div>
-                <div className={styles.configDetail}>
-                  Formato: <strong>{config.formato}</strong>
-                </div>
-                <div className={styles.configDetail}>
-                  Frecuencia: <strong>cada {config.frecuencia_horas}h</strong>
-                </div>
-                <div className={styles.configDetail}>
-                  Último backup: <strong>{fmtDate(config.ultima_ejecucion)}</strong>
-                </div>
+                <div className={styles.configDetail}>Tipo: <strong>{config.tipo}</strong></div>
+                <div className={styles.configDetail}>Formato: <strong>{config.formato}</strong></div>
+                <div className={styles.configDetail}>Frecuencia: <strong>cada {config.frecuencia_horas}h</strong></div>
+                <div className={styles.configDetail}>Último backup: <strong>{fmtDate(config.ultima_ejecucion)}</strong></div>
                 <Button
                   size="sm" variant="secondary"
                   icon={<Settings size={13} />}
@@ -276,18 +277,13 @@ export default function Backup() {
               <div className={styles.noConfig}>
                 <Clock size={32} style={{ color: 'var(--cream-dim)', opacity: 0.4 }} />
                 <p>No hay backup automático configurado.</p>
-                <Button
-                  icon={<Play size={14} />}
-                  style={{ width: '100%' }}
-                  onClick={() => setShowAuto(true)}
-                >
+                <Button icon={<Play size={14} />} style={{ width: '100%' }} onClick={() => setShowAuto(true)}>
                   Configurar automático
                 </Button>
               </div>
             )}
           </Card>
 
-          {/* Info card */}
           <Card className={styles.infoCard}>
             <div className={styles.cardHead}>
               <AlertTriangle size={15} style={{ color: '#f59e0b' }} />
@@ -303,7 +299,78 @@ export default function Backup() {
         </div>
       </div>
 
-      {/* ── Auto config modal ──────────────────────────────────── */}
+      {/* ══ Modal: Confirmar backup con MFA ══════════════════════ */}
+      <Modal
+        open={showConfirmBackup}
+        onClose={() => { setShowConfirmBackup(false); setConfirmMfa(''); }}
+        title="Confirmar respaldo"
+      >
+        {errCreate && <Alert message={errCreate.message.replace('GraphQL error: ', '')} />}
+
+        {/* Resumen de lo que se va a crear */}
+        <div className={styles.confirmSummary}>
+          <div className={styles.confirmRow}>
+            <span className={styles.confirmLabel}>Tipo</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              {TIPO_ICON[manTipo]}
+              <strong style={{ color: 'var(--cream)' }}>{manTipo}</strong>
+            </div>
+          </div>
+          <div className={styles.confirmRow}>
+            <span className={styles.confirmLabel}>Formato</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              {FORMATO_ICON[manFormato]}
+              <strong style={{ color: 'var(--cream)' }}>{manFormato}</strong>
+            </div>
+          </div>
+          <div className={styles.confirmRow}>
+            <span className={styles.confirmLabel}>Descripción</span>
+            <span style={{ fontSize: 12, color: 'var(--cream-dim)' }}>{TIPO_DESC[manTipo]}</span>
+          </div>
+        </div>
+
+        {/* Campo MFA */}
+        <div className={styles.mfaSection}>
+          <div className={styles.mfaLabel}>
+            <ShieldCheck size={14} style={{ color: 'var(--teal)' }} />
+            <span>Código MFA de verificación</span>
+          </div>
+          <p className={styles.mfaHint}>
+            Ingresa el código de 6 dígitos de tu app autenticadora para autorizar esta operación.
+            Si aún no has configurado MFA, deja este campo vacío.
+          </p>
+          <input
+            type="text"
+            inputMode="numeric"
+            maxLength={6}
+            autoFocus
+            value={confirmMfa}
+            onChange={e => setConfirmMfa(e.target.value.replace(/\D/g, ''))}
+            placeholder="123456"
+            className={styles.mfaInputLarge}
+          />
+        </div>
+
+        <div style={{ display: 'flex', gap: 10 }}>
+          <Button
+            variant="secondary"
+            style={{ flex: 1 }}
+            onClick={() => { setShowConfirmBackup(false); setConfirmMfa(''); }}
+          >
+            Cancelar
+          </Button>
+          <Button
+            loading={creating}
+            style={{ flex: 2 }}
+            icon={<Download size={15} />}
+            onClick={handleConfirmBackup}
+          >
+            Crear respaldo
+          </Button>
+        </div>
+      </Modal>
+
+      {/* ══ Modal: Configurar automático ═════════════════════════ */}
       <Modal open={showAuto} onClose={() => setShowAuto(false)} title="Configurar respaldo automático">
         {errConfig && <Alert message={errConfig.message.replace('GraphQL error: ', '')} />}
         <form onSubmit={handleAuto} className={styles.autoForm}>
@@ -336,21 +403,16 @@ export default function Backup() {
             />
           </Field>
           <div style={{ display: 'flex', gap: 10 }}>
-            <Button variant="secondary" style={{ flex: 1 }} onClick={() => setShowAuto(false)}>
-              Cancelar
-            </Button>
-            <Button
-              type="submit" loading={configuring} style={{ flex: 2 }}
-              icon={<Play size={14} />}
-              disabled={autoMfa.length < 6}
-            >
+            <Button variant="secondary" style={{ flex: 1 }} onClick={() => setShowAuto(false)}>Cancelar</Button>
+            <Button type="submit" loading={configuring} style={{ flex: 2 }} icon={<Play size={14} />}
+              disabled={autoMfa.length < 6}>
               Guardar y ejecutar backup inicial
             </Button>
           </div>
         </form>
       </Modal>
 
-      {/* ── Restore confirmation modal ─────────────────────────── */}
+      {/* ══ Modal: Restaurar ═════════════════════════════════════ */}
       <Modal
         open={!!restoreTarget}
         onClose={() => { setRestoreTarget(null); setRestoreMfa(''); }}
@@ -381,12 +443,8 @@ export default function Backup() {
         </Field>
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
           <Button variant="secondary" onClick={() => setRestoreTarget(null)}>Cancelar</Button>
-          <Button
-            variant="danger" loading={restoring}
-            disabled={restoreMfa.length !== 6}
-            icon={<RotateCcw size={14} />}
-            onClick={handleRestore}
-          >
+          <Button variant="danger" loading={restoring} disabled={restoreMfa.length !== 6}
+            icon={<RotateCcw size={14} />} onClick={handleRestore}>
             Restaurar base de datos
           </Button>
         </div>

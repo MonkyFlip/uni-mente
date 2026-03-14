@@ -107,3 +107,49 @@
   .left  { display: none; }
   .right { width: 100%; border-left: none; }
 }
+
+/* ── Password visibility toggle ─────────────────────────────── */
+.pwdWrapper {
+  position: relative;
+}
+.pwdWrapper input {
+  width: 100%;
+}
+.eyeBtn {
+  position: absolute;
+  right: 11px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--cream-dim);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  padding: 0;
+  transition: color 0.15s;
+}
+.eyeBtn:hover { color: var(--cream); }
+
+/* ── Change password link ────────────────────────────────────── */
+.changePwdBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 12px;
+  padding: 9px;
+  background: none;
+  border: 1px dashed var(--border);
+  border-radius: 9px;
+  color: var(--cream-dim);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.changePwdBtn:hover {
+  border-color: var(--teal);
+  color: var(--teal);
+  background: var(--teal-glow);
+}

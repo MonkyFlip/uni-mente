@@ -23,11 +23,14 @@
 .iconBtn {
   width: 30px; height: 30px; border-radius: 7px;
   background: var(--navy); border: 1px solid var(--border);
-  color: var(--cream-dim); cursor: pointer; display: flex; align-items: center; justify-content: center;
+  color: var(--cream-dim) !important;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
   transition: all var(--transition);
+  padding: 0;
+  line-height: 0;
 }
-.iconBtn:hover { border-color: var(--teal); color: var(--teal); background: var(--teal-glow); }
-.iconBtnDanger:hover { border-color: #f87171; color: #f87171; background: rgba(248,113,113,0.1); }
+.iconBtn:hover { border-color: var(--teal); color: var(--teal) !important; background: var(--teal-glow); }
+.iconBtnDanger:hover { border-color: #f87171; color: #f87171 !important; background: rgba(248,113,113,0.1); }
 
 .details { display: flex; flex-direction: column; gap: 6px; }
 .detail { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--cream-dim); }
@@ -41,4 +44,10 @@
 @keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:none} }
 
 /* Fix: ensure SVG icons inside buttons inherit color correctly */
-.iconBtn svg { display: block; pointer-events: none; color: inherit; stroke: currentColor; }
+.iconBtn svg {
+  display: block;
+  pointer-events: none;
+  color: inherit;
+  stroke: currentColor;
+  fill: none;
+}

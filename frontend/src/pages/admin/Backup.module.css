@@ -19,6 +19,8 @@
 .formCard { }
 .backupForm { display: flex; flex-direction: column; gap: 14px; }
 
+.createBtn { margin-top: 10px; }
+
 .typeGrid { display: flex; flex-direction: column; gap: 8px; }
 .typeBtn {
   display: flex; align-items: flex-start; gap: 10px;
@@ -111,3 +113,64 @@
   border-radius: 10px; padding: 14px;
   font-size: 13px;
 }
+
+/* ── Confirm backup modal ────────────────────────────────────── */
+.confirmSummary {
+  background: var(--navy);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.confirmRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+.confirmLabel {
+  font-size: 11px;
+  color: var(--cream-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.mfaSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+.mfaLabel {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--white);
+}
+.mfaHint {
+  font-size: 12px;
+  color: var(--cream-dim);
+  line-height: 1.55;
+  margin: 0;
+}
+.mfaInputLarge {
+  font-size: 28px !important;
+  letter-spacing: 8px;
+  text-align: center;
+  font-weight: 700 !important;
+  padding: 14px !important;
+  border-radius: 12px !important;
+  width: 100%;
+  background: var(--navy) !important;
+  border: 2px solid var(--teal) !important;
+  color: var(--teal) !important;
+}
+.mfaInputLarge:focus { outline: none; box-shadow: 0 0 0 3px var(--teal-glow); }
+.mfaInputLarge::placeholder { color: var(--border); letter-spacing: 4px; font-size: 20px; }

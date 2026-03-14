@@ -129,13 +129,15 @@ export default function AdminPsicologos() {
                 <div className={styles.correo}>{p.usuario.correo}</div>
               </div>
               <div className={styles.cardActions}>
-                <button className={styles.iconBtn} title="Editar" onClick={() => openEdit(p)}>
+                <button type="button" className={styles.iconBtn} title="Editar" onClick={() => openEdit(p)} style={{ color: 'var(--cream-dim)' }}>
                   <Edit2 size={15} strokeWidth={1.8} />
                 </button>
                 <button
+                  type="button"
                   className={`${styles.iconBtn} ${styles.iconBtnDanger}`}
                   title="Eliminar"
                   onClick={() => setDeleteTarget(p)}
+                  style={{ color: 'var(--cream-dim)' }}
                 >
                   <Trash2 size={15} strokeWidth={1.8} />
                 </button>

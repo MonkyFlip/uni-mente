@@ -10,6 +10,31 @@ type AuthPayload {
   rol: String!
 }
 
+type BackupConfig {
+  activo: Boolean!
+  formato: String!
+  frecuencia_horas: Int!
+  id: Int!
+  tipo: String!
+  ultima_ejecucion: DateTime
+}
+
+type BackupLog {
+  created_at: DateTime!
+  formato: String!
+  id_backup: Int!
+  modo: String!
+  nombre_archivo: String!
+  tamanio_kb: Int
+  tipo: String!
+}
+
+input CambiarPasswordInput {
+  codigo_mfa: String
+  password_actual: String!
+  password_nuevo: String!
+}
+
 type Cita {
   created_at: DateTime!
   estado: String!
@@ -23,6 +48,30 @@ type Cita {
   motivo: String
   psicologo: Psicologo!
   sesion: Sesion
+}
+
+input ConfigBackupAutoInput {
+  """Código MFA de 6 dígitos"""
+  codigo_mfa: String!
+
+  """SQL | JSON | EXCEL | CSV"""
+  formato: String!
+
+  """Frecuencia en horas (1–720)"""
+  frecuencia_horas: Int!
+
+  """COMPLETO | DIFERENCIAL | INCREMENTAL"""
+  tipo: String!
+}
+
+input CreateBackupInput {
+  codigo_mfa: String
+
+  """SQL | JSON | EXCEL | CSV"""
+  formato: String!
+
+  """COMPLETO | DIFERENCIAL | INCREMENTAL"""
+  tipo: String!
 }
 
 input CreateCitaInput {
@@ -116,17 +165,45 @@ input LoginInput {
   password: String!
 }
 
+type MfaEstado {
+  mfa_enabled: Boolean!
+}
+
 type Mutation {
   actualizarHorario(id: Int!, input: UpdateHorarioInput!): HorarioPsicologo!
   actualizarPsicologo(id: Int!, input: UpdatePsicologoInput!): Psicologo!
   agendarCita(input: CreateCitaInput!): Cita!
   cambiarEstadoCita(id_cita: Int!, input: UpdateEstadoCitaInput!): Cita!
+
+  """Cambia la contraseña del usuario autenticado"""
+  cambiarPassword(input: CambiarPasswordInput!): Boolean!
+
+  """Configura el backup automático y ejecuta uno inmediatamente."""
+  configurarBackupAutomatico(input: ConfigBackupAutoInput!): BackupConfig!
+
+  """Crea un backup manual. Requiere MFA si la cuenta lo tiene activo."""
+  crearBackup(input: CreateBackupInput!): BackupLog!
   crearHorario(input: CreateHorarioInput!): HorarioPsicologo!
+
+  """Desactiva MFA de la cuenta actual"""
+  deshabilitarMfa(input: VerificarMfaInput!): Boolean!
   eliminarHorario(id: Int!): Boolean!
+
+  """Activa MFA después de escanear el QR y verificar el primer código"""
+  habilitarMfa(input: VerificarMfaInput!): Boolean!
   login(input: LoginInput!): AuthPayload!
   registrarEstudiante(input: CreateEstudianteInput!): Estudiante!
   registrarPsicologo(input: CreatePsicologoInput!): Psicologo!
   registrarSesion(input: CreateSesionInput!): Sesion!
+
+  """Restaura la BD desde un backup. Siempre requiere código MFA."""
+  restaurarBackup(input: RestaurarBackupInput!): Boolean!
+
+  """Genera QR y secreto TOTP para configurar MFA"""
+  setupMfa: SetupMfaPayload!
+
+  """Verifica si un código MFA es válido en este momento"""
+  verificarMfa(input: VerificarMfaInput!): Boolean!
 }
 
 type Psicologo {
@@ -142,13 +219,30 @@ type Psicologo {
 type Query {
   agendaPsicologo(id_psicologo: Int!): [Cita!]!
   citasEstudiante(id_estudiante: Int!): [Cita!]!
+
+  """Obtiene la configuración actual de backup automático"""
+  configBackupAutomatico: BackupConfig
   estudiante(id: Int!): Estudiante!
   estudiantes: [Estudiante!]!
   expedienteEstudiante(id_estudiante: Int!): [HistorialClinico!]!
   historial(id: Int!): HistorialClinico!
   horariosDisponibles(id_psicologo: Int!): [HorarioPsicologo!]!
+
+  """Lista todos los backups disponibles (máx. 3)"""
+  listarBackups: [BackupLog!]!
+
+  """Estado de MFA del usuario autenticado"""
+  miEstadoMfa: MfaEstado!
   psicologo(id: Int!): Psicologo!
   psicologos: [Psicologo!]!
+}
+
+input RestaurarBackupInput {
+  """Código MFA de 6 dígitos"""
+  codigo_mfa: String!
+
+  """ID del backup a restaurar"""
+  id_backup: Int!
 }
 
 type Rol {
@@ -164,6 +258,11 @@ type Sesion {
   notas: String
   numero_sesion: Int!
   recomendaciones: String
+}
+
+type SetupMfaPayload {
+  qr_code: String!
+  secret: String!
 }
 
 input UpdateEstadoCitaInput {
@@ -187,6 +286,11 @@ type Usuario {
   created_at: DateTime!
   id_rol: Int!
   id_usuario: Int!
+  mfa_enabled: Boolean!
   nombre: String!
   rol: Rol!
+}
+
+input VerificarMfaInput {
+  codigo: String!
 }

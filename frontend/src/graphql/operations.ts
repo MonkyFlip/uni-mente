@@ -1,5 +1,7 @@
 import { gql } from '@apollo/client';
 
+// ── Auth ──────────────────────────────────────────────────────────
+
 export const LOGIN = gql`
   mutation Login($correo: String!, $password: String!) {
     login(input: { correo: $correo, password: $password }) {
@@ -23,6 +25,8 @@ export const REGISTRAR_ESTUDIANTE = gql`
     }
   }
 `;
+
+// ── Usuarios / Stats ──────────────────────────────────────────────
 
 export const GET_ESTUDIANTES = gql`
   query GetEstudiantes {
@@ -49,6 +53,20 @@ export const GET_PSICOLOGOS = gql`
   }
 `;
 
+export const GET_PSICOLOGOS_SLIM = gql`
+  query GetPsicologosSlim {
+    psicologos { id_psicologo }
+  }
+`;
+
+export const GET_ESTUDIANTES_SLIM = gql`
+  query GetEstudiantesSlim {
+    estudiantes { id_estudiante }
+  }
+`;
+
+// ── Psicólogos CRUD ───────────────────────────────────────────────
+
 export const REGISTRAR_PSICOLOGO = gql`
   mutation RegistrarPsicologo($input: CreatePsicologoInput!) {
     registrarPsicologo(input: $input) {
@@ -73,6 +91,8 @@ export const ACTUALIZAR_PSICOLOGO = gql`
   }
 `;
 
+// ── Horarios ──────────────────────────────────────────────────────
+
 export const CREAR_HORARIO = gql`
   mutation CrearHorario($input: CreateHorarioInput!) {
     crearHorario(input: $input) {
@@ -91,11 +111,8 @@ export const ELIMINAR_HORARIO = gql`
   }
 `;
 
-/**
- * AgendarCita — el backend resuelve id_estudiante desde el JWT
- * y hora_inicio/hora_fin desde el horario seleccionado.
- * Solo se envía: id_psicologo, id_horario, fecha y motivo opcional.
- */
+// ── Citas ─────────────────────────────────────────────────────────
+
 export const AGENDAR_CITA = gql`
   mutation AgendarCita($input: CreateCitaInput!) {
     agendarCita(input: $input) {
@@ -134,6 +151,7 @@ export const GET_AGENDA_PSICOLOGO = gql`
       estado
       motivo
       estudiante { id_estudiante matricula carrera usuario { nombre correo } }
+      sesion { id_sesion }
     }
   }
 `;
@@ -182,6 +200,111 @@ export const GET_EXPEDIENTE = gql`
           fecha_registro
         }
       }
+    }
+  }
+`;
+
+// ── MFA ───────────────────────────────────────────────────────────
+
+export const GET_MFA_ESTADO = gql`
+  query MiEstadoMfa {
+    miEstadoMfa {
+      mfa_enabled
+    }
+  }
+`;
+
+export const SETUP_MFA = gql`
+  mutation SetupMfa {
+    setupMfa {
+      qr_code
+      secret
+    }
+  }
+`;
+
+export const HABILITAR_MFA = gql`
+  mutation HabilitarMfa($input: VerificarMfaInput!) {
+    habilitarMfa(input: $input)
+  }
+`;
+
+export const DESHABILITAR_MFA = gql`
+  mutation DeshabilitarMfa($input: VerificarMfaInput!) {
+    deshabilitarMfa(input: $input)
+  }
+`;
+
+export const VERIFICAR_MFA = gql`
+  mutation VerificarMfa($input: VerificarMfaInput!) {
+    verificarMfa(input: $input)
+  }
+`;
+
+export const CAMBIAR_PASSWORD = gql`
+  mutation CambiarPassword($input: CambiarPasswordInput!) {
+    cambiarPassword(input: $input)
+  }
+`;
+
+// ── Backup ────────────────────────────────────────────────────────
+
+export const GET_BACKUPS = gql`
+  query ListarBackups {
+    listarBackups {
+      id_backup
+      tipo
+      formato
+      nombre_archivo
+      tamanio_kb
+      modo
+      created_at
+    }
+  }
+`;
+
+export const GET_BACKUP_CONFIG = gql`
+  query ConfigBackupAutomatico {
+    configBackupAutomatico {
+      id
+      tipo
+      formato
+      frecuencia_horas
+      activo
+      ultima_ejecucion
+    }
+  }
+`;
+
+export const CREAR_BACKUP = gql`
+  mutation CrearBackup($input: CreateBackupInput!) {
+    crearBackup(input: $input) {
+      id_backup
+      tipo
+      formato
+      nombre_archivo
+      tamanio_kb
+      modo
+      created_at
+    }
+  }
+`;
+
+export const RESTAURAR_BACKUP = gql`
+  mutation RestaurarBackup($input: RestaurarBackupInput!) {
+    restaurarBackup(input: $input)
+  }
+`;
+
+export const CONFIGURAR_BACKUP_AUTO = gql`
+  mutation ConfigurarBackupAutomatico($input: ConfigBackupAutoInput!) {
+    configurarBackupAutomatico(input: $input) {
+      id
+      tipo
+      formato
+      frecuencia_horas
+      activo
+      ultima_ejecucion
     }
   }
 `;

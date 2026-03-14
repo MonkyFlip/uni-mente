@@ -39,3 +39,6 @@
 .modalFull  { grid-column: 1 / -1; }
 
 @keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:none} }
+
+/* Fix: ensure SVG icons inside buttons inherit color correctly */
+.iconBtn svg { display: block; pointer-events: none; color: inherit; stroke: currentColor; }

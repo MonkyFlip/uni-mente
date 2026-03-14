@@ -3,27 +3,31 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, Calendar, Clock, UserPlus,
   LogOut, Brain, Palette, Check, ChevronRight,
+  Database, ShieldCheck, HelpCircle,
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import type { ThemeId } from '../auth/ThemeContext';
 import { useTheme, THEMES } from '../auth/ThemeContext';
+import { useTour } from '../tours/TourContext';
 import styles from './Sidebar.module.css';
 
 const NAV = {
   estudiante: [
-    { to: '/dashboard',  Icon: LayoutDashboard, label: 'Inicio' },
-    { to: '/psicologos', Icon: Users,            label: 'Psicólogos' },
-    { to: '/mis-citas',  Icon: Calendar,         label: 'Mis Citas' },
+    { to: '/dashboard',  Icon: LayoutDashboard, label: 'Inicio',      tour: 'nav-dashboard'  },
+    { to: '/psicologos', Icon: Users,            label: 'Psicólogos',  tour: 'nav-psicologos' },
+    { to: '/mis-citas',  Icon: Calendar,         label: 'Mis Citas',   tour: 'nav-mis-citas'  },
   ],
   psicologo: [
-    { to: '/dashboard',  Icon: LayoutDashboard, label: 'Inicio' },
-    { to: '/agenda',     Icon: Calendar,         label: 'Agenda' },
-    { to: '/horarios',   Icon: Clock,            label: 'Mis Horarios' },
+    { to: '/dashboard',  Icon: LayoutDashboard, label: 'Inicio',        tour: 'nav-dashboard' },
+    { to: '/agenda',     Icon: Calendar,         label: 'Agenda',        tour: 'nav-agenda'    },
+    { to: '/horarios',   Icon: Clock,            label: 'Mis Horarios',  tour: 'nav-horarios'  },
   ],
   administrador: [
-    { to: '/dashboard',           Icon: LayoutDashboard, label: 'Inicio' },
-    { to: '/admin/psicologos',    Icon: Users,            label: 'Psicólogos' },
-    { to: '/registrar-psicologo', Icon: UserPlus,         label: 'Nuevo Psicólogo' },
+    { to: '/dashboard',           Icon: LayoutDashboard, label: 'Inicio',       tour: 'nav-dashboard' },
+    { to: '/admin/psicologos',    Icon: Users,            label: 'Psicólogos',   tour: 'nav-psicologos' },
+    { to: '/registrar-psicologo', Icon: UserPlus,         label: 'Nuevo Psicólogo', tour: '' },
+    { to: '/admin/backup',        Icon: Database,         label: 'Respaldos',    tour: 'nav-backup' },
+    { to: '/admin/mfa',           Icon: ShieldCheck,      label: 'Seguridad MFA', tour: 'nav-mfa' },
   ],
 };
 
@@ -31,13 +35,14 @@ export function Sidebar() {
   const { user, logout } = useAuth();
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
+  const { start } = useTour();
   const [showPalette, setShowPalette] = useState(false);
 
   const links = NAV[user?.rol ?? 'estudiante'];
 
   return (
     <aside className={styles.sidebar}>
-      <div className={styles.brand}>
+      <div className={styles.brand} data-tour="sidebar-brand">
         <div className={styles.brandIcon}><Brain size={22} strokeWidth={1.8} /></div>
         <div>
           <div className={styles.brandName}>UniMente</div>
@@ -55,12 +60,13 @@ export function Sidebar() {
 
       <nav className={styles.nav}>
         <div className={styles.navLabel}>Menú</div>
-        {links.map(({ to, Icon, label }, i) => (
+        {links.map(({ to, Icon, label, tour }, i) => (
           <NavLink
             key={to}
             to={to}
             style={{ animationDelay: `${i * 60}ms` }}
             className={({ isActive }) => `${styles.navLink} ${isActive ? styles.active : ''}`}
+            {...(tour ? { 'data-tour': tour } : {})}
           >
             <Icon size={17} strokeWidth={1.8} className={styles.navIcon} />
             <span>{label}</span>
@@ -69,7 +75,18 @@ export function Sidebar() {
         ))}
       </nav>
 
-      <div className={styles.themeSection}>
+      {/* Tour re-launch button */}
+      <button
+        className={styles.tourBtn}
+        onClick={start}
+        title="Relanzar guía del sistema"
+        data-tour="sidebar-tour"
+      >
+        <HelpCircle size={15} strokeWidth={1.8} />
+        <span>Guía del sistema</span>
+      </button>
+
+      <div className={styles.themeSection} data-tour="sidebar-theme">
         <button className={styles.themeBtn} onClick={() => setShowPalette(p => !p)}>
           <Palette size={15} strokeWidth={1.8} />
           <span>Paleta: {theme.name}</span>
@@ -98,4 +115,3 @@ export function Sidebar() {
     </aside>
   );
 }
-

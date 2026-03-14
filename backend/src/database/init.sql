@@ -1,7 +1,6 @@
 -- ================================================================
 --  UniMente — Inicialización de base de datos (idempotente)
---  Crea la BD y las tablas si no existen.
---  El usuario admin lo crea el seed con bcrypt correcto.
+--  v5: agrega campos MFA en Usuario y tablas de Backup
 -- ================================================================
 
 CREATE DATABASE IF NOT EXISTS unimente
@@ -10,6 +9,7 @@ CREATE DATABASE IF NOT EXISTS unimente
 
 USE unimente;
 
+-- ── Rol ──────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS Rol (
   id_rol INT         NOT NULL AUTO_INCREMENT,
   nombre VARCHAR(50) NOT NULL,
@@ -19,18 +19,36 @@ CREATE TABLE IF NOT EXISTS Rol (
 
 INSERT IGNORE INTO Rol (nombre) VALUES ('administrador'), ('psicologo'), ('estudiante');
 
+-- ── Usuario ───────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS Usuario (
   id_usuario    INT          NOT NULL AUTO_INCREMENT,
   nombre        VARCHAR(100) NOT NULL,
   correo        VARCHAR(150) NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
   id_rol        INT          NOT NULL,
+  mfa_secret    VARCHAR(255) NULL     COMMENT 'Secreto TOTP base32',
+  mfa_enabled   TINYINT(1)   NOT NULL DEFAULT 0 COMMENT '1=MFA activo',
   created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id_usuario),
   UNIQUE KEY UQ_Usuario_correo (correo),
   CONSTRAINT FK_Usuario_Rol FOREIGN KEY (id_rol) REFERENCES Rol (id_rol)
 ) ENGINE=InnoDB;
 
+-- Migración segura: agrega columnas MFA si ya existe la tabla
+DROP PROCEDURE IF EXISTS _agregar_mfa;
+CREATE PROCEDURE _agregar_mfa()
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Usuario'
+                 AND COLUMN_NAME = 'mfa_secret') THEN
+    ALTER TABLE Usuario ADD COLUMN mfa_secret  VARCHAR(255) NULL;
+    ALTER TABLE Usuario ADD COLUMN mfa_enabled TINYINT(1)  NOT NULL DEFAULT 0;
+  END IF;
+END;
+CALL _agregar_mfa();
+DROP PROCEDURE IF EXISTS _agregar_mfa;
+
+-- ── Estudiante ────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS Estudiante (
   id_estudiante INT          NOT NULL AUTO_INCREMENT,
   id_usuario    INT          NOT NULL,
@@ -43,6 +61,7 @@ CREATE TABLE IF NOT EXISTS Estudiante (
     REFERENCES Usuario (id_usuario) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
+-- ── Psicologo ─────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS Psicologo (
   id_psicologo INT          NOT NULL AUTO_INCREMENT,
   id_usuario   INT          NOT NULL,
@@ -56,6 +75,7 @@ CREATE TABLE IF NOT EXISTS Psicologo (
     REFERENCES Usuario (id_usuario) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
+-- ── Horario_Psicologo ─────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS Horario_Psicologo (
   id_horario   INT         NOT NULL AUTO_INCREMENT,
   id_psicologo INT         NOT NULL,
@@ -68,6 +88,7 @@ CREATE TABLE IF NOT EXISTS Horario_Psicologo (
     REFERENCES Psicologo (id_psicologo) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
+-- ── Cita ──────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS Cita (
   id_cita       INT         NOT NULL AUTO_INCREMENT,
   id_estudiante INT         NOT NULL,
@@ -86,6 +107,7 @@ CREATE TABLE IF NOT EXISTS Cita (
     REFERENCES Psicologo (id_psicologo) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
+-- ── Sesion ────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS Sesion (
   id_sesion       INT      NOT NULL AUTO_INCREMENT,
   id_cita         INT      NOT NULL,
@@ -99,6 +121,7 @@ CREATE TABLE IF NOT EXISTS Sesion (
     REFERENCES Cita (id_cita) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
+-- ── Historial_Clinico ─────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS Historial_Clinico (
   id_historial   INT      NOT NULL AUTO_INCREMENT,
   id_estudiante  INT      NOT NULL,
@@ -112,6 +135,7 @@ CREATE TABLE IF NOT EXISTS Historial_Clinico (
     REFERENCES Psicologo (id_psicologo) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
+-- ── Detalle_Historial ─────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS Detalle_Historial (
   id_detalle     INT      NOT NULL AUTO_INCREMENT,
   id_historial   INT      NOT NULL,
@@ -123,4 +147,27 @@ CREATE TABLE IF NOT EXISTS Detalle_Historial (
     REFERENCES Historial_Clinico (id_historial) ON DELETE CASCADE,
   CONSTRAINT FK_Detalle_Sesion FOREIGN KEY (id_sesion)
     REFERENCES Sesion (id_sesion) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- ── Backup_Log ────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS Backup_Log (
+  id_backup      INT          NOT NULL AUTO_INCREMENT,
+  tipo           VARCHAR(20)  NOT NULL COMMENT 'COMPLETO|DIFERENCIAL|INCREMENTAL',
+  formato        VARCHAR(10)  NOT NULL COMMENT 'SQL|JSON|EXCEL|CSV',
+  nombre_archivo VARCHAR(255) NOT NULL,
+  tamanio_kb     INT          NULL,
+  modo           VARCHAR(15)  NOT NULL COMMENT 'MANUAL|AUTOMATICO',
+  created_at     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id_backup)
+) ENGINE=InnoDB;
+
+-- ── Backup_Config ─────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS Backup_Config (
+  id               INT         NOT NULL AUTO_INCREMENT,
+  tipo             VARCHAR(20) NOT NULL COMMENT 'COMPLETO|DIFERENCIAL|INCREMENTAL',
+  formato          VARCHAR(10) NOT NULL COMMENT 'SQL|JSON|EXCEL|CSV',
+  frecuencia_horas INT         NOT NULL DEFAULT 24,
+  activo           TINYINT(1)  NOT NULL DEFAULT 1,
+  ultima_ejecucion DATETIME    NULL,
+  PRIMARY KEY (id)
 ) ENGINE=InnoDB;

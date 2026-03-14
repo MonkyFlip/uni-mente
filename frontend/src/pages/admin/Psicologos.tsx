@@ -120,11 +120,11 @@ export default function AdminPsicologos() {
               </div>
               <div className={styles.cardActions}>
                 <button className={styles.iconBtn} title="Editar" onClick={() => openEdit(p)}>
-                  <Edit2 size={15} />
+                  <Edit2 size={15} strokeWidth={1.8} />
                 </button>
                 <button className={`${styles.iconBtn} ${styles.iconBtnDanger}`} title="Eliminar"
                   onClick={() => setDeleteTarget(p)}>
-                  <Trash2 size={15} />
+                  <Trash2 size={15} strokeWidth={1.8} />
                 </button>
               </div>
             </div>
@@ -204,7 +204,7 @@ export default function AdminPsicologos() {
         </p>
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
           <Button variant="secondary" onClick={() => setDeleteTarget(null)}>Cancelar</Button>
-          <Button variant="danger" icon={<Trash2 size={14} />}
+          <Button variant="danger" icon={<Trash2 size={14} strokeWidth={1.8} />}
             onClick={() => setDeleteTarget(null)}>
             Eliminar
           </Button>

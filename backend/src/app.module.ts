@@ -3,6 +3,7 @@ import { GraphQLModule } from '@nestjs/graphql';
 import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { join } from 'path';
 import { readFileSync } from 'fs';
 import * as mysql2 from 'mysql2/promise';
@@ -18,9 +19,10 @@ import { CitaModule } from './cita/cita.module';
 import { SesionModule } from './sesion/sesion.module';
 import { HistorialClinicoModule } from './historial-clinico/historial-clinico.module';
 import { DetalleHistorialModule } from './detalle-historial/detalle-historial.module';
+import { MfaModule } from './mfa/mfa.module';
+import { BackupModule } from './backup/backup.module';
 
 async function initDatabase(config: ConfigService): Promise<void> {
-  // ── 1. Crear BD y tablas (idempotente) ──────────────────────────
   const connInit = await mysql2.createConnection({
     host:               config.get('DB_HOST', 'localhost'),
     port:               +config.get('DB_PORT', 3306),
@@ -28,17 +30,14 @@ async function initDatabase(config: ConfigService): Promise<void> {
     password:           config.get('DB_PASSWORD', ''),
     multipleStatements: true,
   });
-
   try {
     const sqlPath = join(process.cwd(), 'src', 'database', 'init.sql');
-    const sql = readFileSync(sqlPath, 'utf8');
-    await connInit.query(sql);
+    await connInit.query(readFileSync(sqlPath, 'utf8'));
     console.log('Base de datos inicializada correctamente.');
   } finally {
     await connInit.end();
   }
 
-  // ── 2. Seed automático solo si la BD está vacía ─────────────────
   const connSeed = await mysql2.createConnection({
     host:               config.get('DB_HOST', 'localhost'),
     port:               +config.get('DB_PORT', 3306),
@@ -47,11 +46,8 @@ async function initDatabase(config: ConfigService): Promise<void> {
     database:           config.get('DB_NAME', 'unimente'),
     multipleStatements: true,
   });
-
   try {
-    const [[{ total }]] = await connSeed.query<any>(
-      'SELECT COUNT(*) AS total FROM Psicologo',
-    );
+    const [[{ total }]] = await connSeed.query<any>('SELECT COUNT(*) AS total FROM Psicologo');
     if (Number(total) === 0) {
       console.log('BD vacía — ejecutando seed de datos de prueba...');
       await runSeed(connSeed);
@@ -66,6 +62,7 @@ async function initDatabase(config: ConfigService): Promise<void> {
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    ScheduleModule.forRoot(),
 
     GraphQLModule.forRoot<ApolloDriverConfig>({
       driver: ApolloDriver,
@@ -105,6 +102,8 @@ async function initDatabase(config: ConfigService): Promise<void> {
     SesionModule,
     HistorialClinicoModule,
     DetalleHistorialModule,
+    MfaModule,
+    BackupModule,
   ],
 })
 export class AppModule {}

@@ -1,11 +1,7 @@
 import { ObjectType, Field, Int } from '@nestjs/graphql';
 import {
-  Column,
-  CreateDateColumn,
-  Entity,
-  ManyToOne,
-  JoinColumn,
-  PrimaryGeneratedColumn,
+  Column, CreateDateColumn, Entity,
+  ManyToOne, JoinColumn, PrimaryGeneratedColumn,
 } from 'typeorm';
 import { Rol } from '../rol/rol.entity';
 
@@ -24,7 +20,7 @@ export class Usuario {
   @Column({ length: 150, unique: true })
   correo: string;
 
-  // La contraseña NO se expone en GraphQL
+  // Nunca expuesto en GraphQL
   @Column({ length: 255 })
   password_hash: string;
 
@@ -40,4 +36,12 @@ export class Usuario {
   @Field()
   @CreateDateColumn()
   created_at: Date;
+
+  // ── MFA — NO expuesto en GraphQL ────────────────────────────────
+  @Column({ length: 255, nullable: true })
+  mfa_secret?: string;
+
+  @Field()
+  @Column({ type: 'tinyint', default: 0 })
+  mfa_enabled: boolean;
 }

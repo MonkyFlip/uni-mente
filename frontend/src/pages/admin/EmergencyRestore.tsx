@@ -101,7 +101,9 @@ export default function EmergencyRestore() {
       if (!res.ok) {
         setError(data.message ?? 'Error en la restauración.');
       } else {
-        setSuccess(data.mensaje ?? 'Base de datos restaurada correctamente.');
+        const msg = data.mensaje ?? 'Base de datos restaurada correctamente.';
+        setSuccess(msg + ' Redirigiendo al login...');
+        setTimeout(() => { window.location.href = '/login'; }, 2500);
       }
     } catch {
       setError('No se pudo conectar con el servidor. Verifica que el backend esté corriendo.');
@@ -215,7 +217,7 @@ export default function EmergencyRestore() {
           {success && (
             <div className={styles.alertSuccess}>
               <CheckCircle2 size={14} />
-              <span>{success} <a href="/login">Ir al login</a></span>
+              <span>{success}</span>
             </div>
           )}
 

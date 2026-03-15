@@ -501,7 +501,7 @@ Si la BD tiene aunque sea un usuario, el endpoint devuelve `401 Unauthorized`.
 http://localhost:5173/emergency-restore
 ```
 
-Página pública (sin login) con **dashboard de backups disponibles**. Muestra los 3 respaldos más recientes de `backend/Backup/` con nombre, tipo, formato, tamaño y fecha. El administrador selecciona el backup con un clic y escribe la clave secreta — sin necesidad de buscar archivos manualmente.
+Página pública (sin login) con **dashboard de backups disponibles**. Muestra los 3 respaldos más recientes de `backend/Backup/` con nombre, tipo, formato, tamaño y fecha. El administrador selecciona el backup con un clic y escribe la clave secreta — sin necesidad de buscar archivos manualmente. Al completar la restauración, **redirige automáticamente a `/login`** tras 2.5 segundos.
 
 Endpoint público adicional `GET /api/emergency-backups` — sin JWT, lee el filesystem y combina con `Backup_Log` si la BD tiene datos. Devuelve hasta 3 backups ordenados por fecha descendente.
 

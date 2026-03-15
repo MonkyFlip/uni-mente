@@ -16,10 +16,10 @@ Stack: **React 18 · TypeScript · Vite · Apollo Client · React Router · CSS 
 7. [Autenticación y contexto global](#7-autenticación-y-contexto-global)
 8. [Apollo Client](#8-apollo-client)
 9. [Guía interactiva del sistema](#9-guía-interactiva-del-sistema)
-10. [Componentes reutilizables](#10-componentes-reutilizables)
-11. [Paginación](#11-paginación)
-12. [Módulo MFA — Seguridad](#12-módulo-mfa--seguridad)
-13. [Módulo de respaldos](#13-módulo-de-respaldos)
+10. [Componentes reutilizables y paginación](#10-componentes-reutilizables-y-paginación)
+11. [Módulo MFA](#11-módulo-mfa)
+12. [Módulo de respaldos](#12-módulo-de-respaldos)
+13. [Restauración de emergencia](#13-restauración-de-emergencia)
 14. [Operaciones GraphQL](#14-operaciones-graphql)
 15. [Decisiones técnicas y bugs resueltos](#15-decisiones-técnicas-y-bugs-resueltos)
 16. [Scripts disponibles](#16-scripts-disponibles)
@@ -48,7 +48,7 @@ npm install --legacy-peer-deps
 
 ## 3. Variables de entorno
 
-Crea el archivo `.env` en `frontend/` (opcional — el cliente ya apunta a `localhost:3000` por defecto):
+Opcional — Apollo Client apunta a `localhost:3000` por defecto:
 
 ```env
 VITE_API_URL=http://localhost:3000/graphql
@@ -59,16 +59,9 @@ VITE_API_URL=http://localhost:3000/graphql
 ## 4. Iniciar la aplicación
 
 ```bash
-# Desarrollo
-npm run dev
-```
-
-La aplicación abre en http://localhost:5173
-
-```bash
-# Producción
-npm run build
-npm run preview
+npm run dev       # Desarrollo → http://localhost:5173
+npm run build     # Producción → dist/
+npm run preview   # Previsualizar build
 ```
 
 ---
@@ -76,57 +69,58 @@ npm run preview
 ## 5. Estructura del proyecto
 
 ```
-frontend/
-├── src/
-│   ├── main.tsx
-│   ├── App.tsx                           # Router + providers + TourProvider
-│   ├── index.css                         # Variables CSS globales (tokens de diseño)
-│   │
-│   ├── apollo/
-│   │   └── client.ts                     # Apollo Client con auth link + error link
-│   │
-│   ├── auth/
-│   │   ├── AuthContext.tsx               # Contexto global del usuario autenticado
-│   │   ├── ProtectedRoute.tsx            # Guard de rutas por rol
-│   │   └── ThemeContext.tsx              # Paleta de colores (6 temas)
-│   │
-│   ├── tours/
-│   │   ├── tourSteps.ts                  # Pasos por rol (estudiante, psicólogo, admin)
-│   │   ├── TourContext.tsx               # Estado y lógica del tour
-│   │   ├── Tour.tsx                      # Overlay SVG + tooltip animado
-│   │   └── Tour.module.css
-│   │
-│   ├── components/
-│   │   ├── UI.tsx                        # Button, Card, Modal, Badge, Pagination...
-│   │   ├── UI.module.css
-│   │   ├── Layout.tsx / Layout.module.css
-│   │   ├── Sidebar.tsx / Sidebar.module.css
-│   │   ├── DatePicker.tsx                # Selector de fecha con día de semana forzado
-│   │   └── TimePicker.tsx                # Selector HH:MM
-│   │
-│   ├── graphql/
-│   │   └── operations.ts                 # Todas las queries y mutations GraphQL
-│   │
-│   └── pages/
-│       ├── Login.tsx                     # Login + modal cambio de contraseña con MFA
-│       ├── CambiarPassword.module.css
-│       ├── Registro.tsx
-│       ├── Dashboard.tsx                 # Stats en tiempo real por rol
-│       ├── admin/
-│       │   ├── Psicologos.tsx            # CRUD con paginación (9 por página)
-│       │   ├── RegistrarPsicologo.tsx
-│       │   ├── Backup.tsx                # Respaldos con modal MFA de confirmación
-│       │   └── MfaConfig.tsx             # Activar/desactivar TOTP
-│       ├── estudiante/
-│       │   ├── Psicologos.tsx            # Buscar y agendar cita (6 por página)
-│       │   └── MisCitas.tsx              # Ver y cancelar citas (10 por página)
-│       └── psicologo/
-│           ├── Agenda.tsx                # Gestionar citas (8/10 por sección)
-│           └── Horarios.tsx              # CRUD de horarios disponibles
+frontend/src/
+├── App.tsx                           # Router + providers + TourProvider
+├── index.css                         # Variables CSS globales (tokens de diseño)
 │
-├── .env
-├── vite.config.ts
-└── package.json
+├── apollo/
+│   └── client.ts                     # errorLink + authLink + httpLink
+│
+├── auth/
+│   ├── AuthContext.tsx               # User en localStorage, login/logout
+│   ├── ProtectedRoute.tsx            # Guard por rol
+│   └── ThemeContext.tsx              # 6 paletas de colores
+│
+├── tours/
+│   ├── tourSteps.ts                  # Pasos por rol (7 pasos cada uno)
+│   ├── TourContext.tsx               # Estado + localStorage por rol
+│   ├── Tour.tsx                      # Overlay SVG + tooltip animado
+│   └── Tour.module.css
+│
+├── components/
+│   ├── UI.tsx                        # Button, Card, Modal, Badge,
+│   │                                 # Pagination, usePagination, StatCard...
+│   ├── UI.module.css
+│   ├── Layout.tsx / Layout.module.css
+│   ├── Sidebar.tsx                   # Nav + botón Guía + links Backup/MFA
+│   ├── Sidebar.module.css
+│   ├── DatePicker.tsx                # Selector de fecha con día de semana forzado
+│   └── TimePicker.tsx                # Selector HH:MM → backend recibe HH:MM:SS
+│
+├── graphql/
+│   └── operations.ts                 # Todas las queries y mutations
+│
+└── pages/
+    ├── Login.tsx                     # Login + modal cambio contraseña con MFA
+    ├── CambiarPassword.module.css
+    ├── Login.module.css
+    ├── Registro.tsx
+    ├── Dashboard.tsx                 # Stats reales por rol vía Apollo
+    │
+    ├── admin/
+    │   ├── Psicologos.tsx            # CRUD paginado (9/página)
+    │   ├── RegistrarPsicologo.tsx
+    │   ├── Backup.tsx                # Modal MFA antes de crear backup
+    │   ├── MfaConfig.tsx             # Activar/desactivar TOTP, nota sobre pwd
+    │   └── EmergencyRestore.tsx      # Panel público para BD vacía
+    │
+    ├── estudiante/
+    │   ├── Psicologos.tsx            # Búsqueda + agendar (6/página)
+    │   └── MisCitas.tsx              # Filtros + paginación (10/página)
+    │
+    └── psicologo/
+        ├── Agenda.tsx                # Próximas (8/pág) + Historial (10/pág)
+        └── Horarios.tsx
 ```
 
 ---
@@ -135,35 +129,26 @@ frontend/
 
 | Ruta | Página | Acceso |
 |---|---|---|
-| `/` | → Redirige a `/login` | Público |
-| `/login` | Login + botón cambiar contraseña | Público |
+| `/` | → `/login` | Público |
+| `/login` | Login + cambio contraseña | Público |
 | `/registro` | Registro de estudiante | Público |
-| `/dashboard` | Dashboard con stats en tiempo real | Autenticado |
-| `/psicologos` | Lista de psicólogos con paginación | Autenticado |
-| `/mis-citas` | Mis citas con filtros y paginación | Solo estudiante |
-| `/agenda` | Agenda con paginación por sección | Solo psicólogo |
-| `/horarios` | CRUD de horarios disponibles | Solo psicólogo |
-| `/admin/psicologos` | CRUD de psicólogos con paginación | Solo administrador |
-| `/registrar-psicologo` | Formulario rápido de registro | Solo administrador |
+| `/emergency-restore` | Restauración de emergencia | Público |
+| `/dashboard` | Stats en tiempo real | Autenticado |
+| `/psicologos` | Lista con paginación | Autenticado |
+| `/mis-citas` | Filtros + paginación | Solo estudiante |
+| `/agenda` | Dos secciones paginadas | Solo psicólogo |
+| `/horarios` | CRUD de disponibilidad | Solo psicólogo |
+| `/admin/psicologos` | CRUD paginado | Solo administrador |
+| `/registrar-psicologo` | Formulario rápido | Solo administrador |
 | `/admin/backup` | Dashboard de respaldos | Solo administrador |
-| `/admin/mfa` | Configuración de MFA | Todos (autenticado) |
-| `/*` | → Redirige a `/dashboard` | — |
-
-### Guard de rutas
-
-```tsx
-<Route path="/agenda" element={
-  <ProtectedRoute roles={['psicologo']}>
-    <Agenda />
-  </ProtectedRoute>
-} />
-```
+| `/admin/mfa` | Configurar TOTP | Todos (autenticado) |
+| `/*` | → `/dashboard` | — |
 
 ---
 
 ## 7. Autenticación y contexto global
 
-### Estructura del usuario en contexto
+### Estructura del usuario
 
 ```typescript
 interface User {
@@ -175,18 +160,18 @@ interface User {
 }
 ```
 
-El usuario se persiste en `localStorage` para sobrevivir recargas.
+Persiste en `localStorage` para sobrevivir recargas.
 
-### Cambio de contraseña desde Login
+### Cambio de contraseña (desde Login)
 
-El botón "Cambiar contraseña" en la página de login abre un modal que requiere:
+El botón "Cambiar contraseña" abre un modal que requiere:
 
 1. Correo de la cuenta
 2. Contraseña actual
 3. Nueva contraseña (mínimo 8 caracteres)
-4. **Código MFA de 6 dígitos — siempre obligatorio**
+4. **Código MFA de 6 dígitos — siempre obligatorio, sin excepción**
 
-El código MFA es **siempre requerido** independientemente de si la cuenta lo tiene activo o no en ese momento. Esto previene que alguien con acceso físico al dispositivo cambie la contraseña de otra persona.
+El botón "Actualizar contraseña" permanece deshabilitado hasta que los 6 dígitos estén completos. No hay forma de omitir el paso de MFA — esto previene que alguien con acceso al dispositivo cambie la contraseña sin autorización del dueño de la cuenta.
 
 ---
 
@@ -194,71 +179,74 @@ El código MFA es **siempre requerido** independientemente de si la cuenta lo ti
 
 `src/apollo/client.ts` encadena tres links:
 
-**errorLink** — detecta respuestas `Unauthorized` y redirige al login limpiando localStorage.
+**errorLink** — detecta `Unauthorized` y redirige a `/login` limpiando `localStorage`.
 
-**authLink** — adjunta el JWT a cada petición:
+**authLink** — adjunta JWT:
 ```typescript
 authorization: token ? `Bearer ${token}` : ''
 ```
 
-**httpLink** — apunta a `http://localhost:3000/graphql`.
+**httpLink** — `http://localhost:3000/graphql`.
 
-La caché usa `fetchPolicy: 'cache-and-network'` como defecto global.
+Caché con `fetchPolicy: 'cache-and-network'` global.
 
 ---
 
 ## 9. Guía interactiva del sistema
 
-### Funcionamiento
+### Comportamiento
 
-Al iniciar sesión por primera vez, el sistema activa automáticamente una guía interactiva (tour) que:
-
-- Muestra un overlay oscuro con un recorte sobre el elemento destacado
-- Resalta cada elemento con un borde teal animado
-- Presenta un tooltip con título, descripción y barra de progreso
-- Recuerda que la guía ya fue completada via `localStorage` (clave: `unimente_tour_v1_{rol}`)
-
-### Relanzar la guía
-
-El botón **"Guía del sistema"** (icono `HelpCircle`) en la barra lateral permite relanzarla en cualquier momento sin importar si ya fue completada.
+Al iniciar sesión por primera vez, se activa automáticamente una guía que:
+- Muestra overlay oscuro con recorte SVG sobre el elemento resaltado
+- Tooltip animado con título, descripción y barra de progreso de pasos
+- Al completarse o saltarse, guarda `unimente_tour_v1_{rol}` en `localStorage`
+- El botón **"Guía del sistema"** (icono `HelpCircle`) en la barra lateral la relanza en cualquier momento
 
 ### Pasos por rol
 
-| Rol | Pasos | Temas cubiertos |
+| Rol | Pasos | Cubre |
 |---|---|---|
-| Estudiante | 7 | Dashboard, psicólogos, mis citas, stats, acciones rápidas, tema |
-| Psicólogo | 7 | Dashboard, agenda, horarios, stats, acciones rápidas, tema |
-| Administrador | 7 | Dashboard, psicólogos, stats, respaldos, seguridad MFA, tema |
+| Estudiante | 7 | Dashboard, psicólogos, mis citas, stats, acciones, tema |
+| Psicólogo | 7 | Dashboard, agenda, horarios, stats, acciones, tema |
+| Administrador | 7 | Dashboard, psicólogos, stats, respaldos, MFA, tema |
 
-### `data-tour` attributes
+### Atributos `data-tour`
 
-Los elementos del DOM que participan en el tour tienen el atributo `data-tour`:
-
+Los elementos del DOM con `data-tour` son los objetivos del tour:
 ```
 sidebar-brand    nav-dashboard    nav-psicologos    nav-mis-citas
 nav-agenda       nav-horarios     nav-backup        nav-mfa
 tour-stats       tour-actions     sidebar-theme
 ```
 
+### Nota técnica — `import type`
+
+```typescript
+import { TOUR_STEPS } from './tourSteps';
+import type { TourStep } from './tourSteps';  // obligatorio
+```
+
+Vite ESM no puede importar interfaces TypeScript como valores. Sin `import type`, lanza `SyntaxError: does not provide an export named 'TourStep'` en runtime.
+
 ---
 
-## 10. Componentes reutilizables
+## 10. Componentes reutilizables y paginación
 
 ### `UI.tsx` — componentes base
 
-| Componente | Props principales | Descripción |
+| Componente | Props | Descripción |
 |---|---|---|
-| `Button` | `variant`, `size`, `loading`, `icon` | Botón con estados de carga |
-| `Card` | `hoverable` | Tarjeta con sombra y borde |
+| `Button` | `variant`, `size`, `loading`, `icon` | Con estados de carga |
+| `Card` | `hoverable` | Tarjeta con borde |
 | `Modal` | `open`, `onClose`, `title` | Diálogo con overlay |
-| `Field` | `label`, `error` | Wrapper de campo de formulario |
-| `Alert` | `message`, `type` | Mensaje de éxito o error |
-| `Badge` | `label`, `variant` | Etiqueta de estado coloreada |
+| `Field` | `label`, `error` | Wrapper de campo |
+| `Alert` | `message`, `type` | Error o éxito |
+| `Badge` | `label`, `variant` | Etiqueta coloreada |
 | `Spinner` | `size` | Indicador de carga |
-| `EmptyState` | `icon`, `title`, `description` | Estado vacío de listas |
-| `PageHeader` | `title`, `subtitle`, `action` | Cabecera de página |
-| `StatCard` | `icon`, `label`, `value` | Tarjeta de métrica en dashboard |
-| `Pagination` | `total`, `page`, `pageSize`, `onChange` | Paginación con ellipsis |
+| `EmptyState` | `icon`, `title`, `description` | Estado vacío |
+| `PageHeader` | `title`, `subtitle`, `action` | Cabecera |
+| `StatCard` | `icon`, `label`, `value` | Métrica de dashboard |
+| `Pagination` | `total`, `page`, `pageSize`, `onChange` | Con ellipsis |
 
 ### `usePagination<T>` hook
 
@@ -266,201 +254,231 @@ tour-stats       tour-actions     sidebar-theme
 const { page, setPage, slice, total, pageSize } = usePagination(items, pageSize);
 ```
 
-Hace scroll al top automáticamente al cambiar de página. `slice` son los elementos de la página actual. Al filtrar la lista se reinicia a la página 1 llamando `setPage(1)`.
+- `slice` → elementos de la página actual
+- `setPage(1)` al filtrar para volver a la primera página
+- Hace scroll al top automáticamente al cambiar de página
+
+### Paginación por vista
+
+| Vista | Por página | Notas |
+|---|---|---|
+| Admin Psicólogos | 9 | Reset al buscar |
+| Estudiante Psicólogos | 6 | Reset al buscar |
+| Mis Citas | 10 | Filtros de estado con conteo + reset |
+| Agenda Próximas | 8 | Independiente de Historial |
+| Agenda Historial | 10 | Independiente de Próximas |
 
 ### `DatePicker.tsx`
 
-Selector de fecha que bloquea días de la semana no permitidos. Usado en el agendamiento de citas para que el estudiante solo pueda elegir fechas que coincidan con el horario seleccionado.
+Bloquea días de la semana no permitidos. Al agendar, el estudiante solo puede seleccionar fechas del día de semana del horario elegido.
 
 ### `TimePicker.tsx`
 
-Selector `HH:MM`. El formulario convierte a `HH:MM:SS` antes de enviar al backend.
+Devuelve `HH:MM`. La función `toTimeDB()` en `Horarios.tsx` lo convierte a `HH:MM:SS` antes de enviar al backend:
+```typescript
+function toTimeDB(t: string): string {
+  return t.split(':').length === 2 ? `${t}:00` : t;
+}
+```
 
 ---
 
-## 11. Paginación
-
-Implementada en todas las vistas con listas largas:
-
-| Vista | Registros por página | Notas |
-|---|---|---|
-| Admin › Psicólogos | 9 | Se reinicia al cambiar búsqueda |
-| Estudiante › Psicólogos | 6 | Se reinicia al cambiar búsqueda |
-| Estudiante › Mis Citas | 10 | Paginación + filtros de estado con conteo |
-| Psicólogo › Agenda — Próximas | 8 | Paginación independiente por sección |
-| Psicólogo › Agenda — Historial | 10 | Paginación independiente por sección |
-
-El componente `Pagination` muestra el rango de registros (`1–9 de 12`), botones de anterior/siguiente y números de página con puntos suspensivos automáticos para listas largas.
-
----
-
-## 12. Módulo MFA — Seguridad
+## 11. Módulo MFA
 
 ### Página `/admin/mfa`
 
-Accesible para cualquier usuario autenticado. Permite:
+Accesible para cualquier usuario autenticado.
 
-- **Activar MFA** — genera un código QR escaneablecon Google Authenticator o Microsoft Authenticator. El secreto base32 también se muestra para ingreso manual. MFA no se activa hasta que se verifica el primer código de la app.
-- **Desactivar MFA** — requiere un código válido de la app para confirmar.
-- **Nota informativa** — indica que el cambio de contraseña se realiza desde el login.
-
-### Flujo de activación
-
+**Activar MFA (2 pasos):**
 ```
-1. Clic en "Activar MFA"
-   → backend genera secreto TOTP + URL otpauth://
+1. Clic "Activar MFA"
+   → backend genera secreto TOTP
    → frontend recibe qr_code (PNG base64) + secret (base32)
-
-2. Usuario escanea QR con su app
-
-3. Ingresa código de 6 dígitos para confirmar sincronización
-
-4. MFA activo — operaciones sensibles requieren código
+2. Usuario escanea QR con Google/Microsoft Authenticator
+3. Ingresa código de 6 dígitos para confirmar
+4. MFA activo
 ```
 
-### Cambio de contraseña (desde Login)
+**Desactivar MFA:** Requiere un código válido de la app para confirmar.
 
-El modal de cambio de contraseña siempre exige el código MFA de 6 dígitos como medida de seguridad obligatoria. El botón de envío permanece deshabilitado hasta que los 6 dígitos estén completos.
+**Nota sobre cambio de contraseña:** La página MFA informa que el cambio de contraseña se realiza desde el login. No incluye formulario de contraseña propio.
+
+### Error de MFA en modales — manejo de estado
+
+Los modales de backup y restauración usan estado local `backupError` en lugar del `error` del hook de Apollo. Esto permite limpiar el mensaje de error al instante cuando el usuario modifica el código, sin esperar a que la mutation vuelva a ejecutarse.
+
+```typescript
+const [backupError, setBackupError] = useState('');
+
+onChange={e => {
+  setConfirmMfa(e.target.value.replace(/\D/g, ''));
+  setBackupError('');  // limpia el error al escribir
+}}
+```
 
 ---
 
-## 13. Módulo de respaldos
+## 12. Módulo de respaldos
 
 ### Página `/admin/backup`
 
-Solo accesible para administradores.
+Solo para administradores con MFA activo y configurado.
 
-### Crear respaldo manual
+### Crear backup manual
 
-1. Seleccionar tipo: `COMPLETO` / `DIFERENCIAL` / `INCREMENTAL`
-2. Seleccionar formato: `SQL` / `JSON` / `EXCEL` / `CSV`
-3. Clic en "Crear respaldo" → **se abre un modal de confirmación** que muestra un resumen del backup y solicita el código MFA
-4. Ingresar código de 6 dígitos → confirmar
+1. Seleccionar tipo y formato en la página
+2. Clic en "Crear respaldo" → **abre modal de confirmación**
+3. El modal muestra resumen (tipo, formato, descripción)
+4. Campo MFA grande y prominente (6 dígitos, obligatorio)
+5. Botón "Crear respaldo" deshabilitado hasta completar 6 dígitos
 
-El campo MFA en el modal de confirmación es grande y visualmente prominente. Si el administrador no tiene MFA configurado, puede dejarlo vacío y el backend lo acepta.
+### Restaurar backup
+
+Botón "Restaurar" en cada fila abre modal de confirmación con:
+- Aviso de impacto (COMPLETO borra todo / parciales actualizan)
+- Campo MFA obligatorio de 6 dígitos
 
 ### Backup automático
 
-Al configurar el backup automático se ejecuta **un backup inmediato** de seguridad y luego el scheduler verifica cada hora si ha transcurrido el tiempo configurado.
+- Clic "Configurar automático" → modal con tipo, formato, frecuencia y MFA
+- Al guardar se ejecuta un backup inmediato
+- Scheduler verifica cada hora (`@Cron(EVERY_HOUR)`)
 
-### Lista de respaldos
+---
 
-Muestra los últimos 3 backups con: nombre de archivo, tipo, formato, modo (MANUAL/AUTOMÁTICO), tamaño y fecha. Cada entrada tiene un botón **Restaurar** que abre un modal de confirmación con código MFA requerido.
+## 13. Restauración de emergencia
+
+### Página `/emergency-restore`
+
+Pública — sin login, sin JWT. Para usar cuando la BD está vacía.
+
+### Flujo
+
+```
+1. Abrir http://localhost:5173/emergency-restore
+2. Ingresar RESTORE_SECRET del archivo .env del servidor
+3. Ingresar ID del backup O nombre del archivo (están en backend/Backup/)
+4. Clic "Restaurar base de datos"
+5. El backend verifica BD vacía + clave secreta → restaura
+6. Ir a /login con las credenciales normales
+```
+
+El formulario tiene:
+- Campo de clave secreta con toggle mostrar/ocultar
+- Campo de ID numérico del backup
+- Campo alternativo de nombre de archivo
+- Mensajes de error/éxito claros
+- Botón deshabilitado durante la operación
 
 ---
 
 ## 14. Operaciones GraphQL
 
-Todas centralizadas en `src/graphql/operations.ts`.
+Centralizadas en `src/graphql/operations.ts`.
 
-### Auth y usuarios
+### Auth y stats
 
-| Operación | Variables | Descripción |
-|---|---|---|
-| `LOGIN` | `correo, password` | Devuelve JWT + rol + id_perfil |
-| `REGISTRAR_ESTUDIANTE` | `input: CreateEstudianteInput!` | Registro público |
-| `GET_PSICOLOGOS` | — | Lista completa con horarios |
-| `GET_PSICOLOGOS_SLIM` | — | Solo id_psicologo (para stats) |
-| `GET_ESTUDIANTES_SLIM` | — | Solo id_estudiante (para stats) |
+| Operación | Descripción |
+|---|---|
+| `LOGIN` | Devuelve JWT + rol + id_perfil |
+| `REGISTRAR_ESTUDIANTE` | Registro público |
+| `GET_PSICOLOGOS` | Lista completa con horarios |
+| `GET_PSICOLOGOS_SLIM` | Solo id (para conteo en dashboard) |
+| `GET_ESTUDIANTES_SLIM` | Solo id (para conteo en dashboard) |
 
 ### MFA
 
 | Operación | Descripción |
 |---|---|
-| `GET_MFA_ESTADO` | Consulta si MFA está activo |
-| `SETUP_MFA` | Genera QR + secreto TOTP |
+| `GET_MFA_ESTADO` | Consulta `mfa_enabled` |
+| `SETUP_MFA` | Genera QR + secreto |
 | `HABILITAR_MFA(codigo)` | Activa MFA |
 | `DESHABILITAR_MFA(codigo)` | Desactiva MFA |
 | `VERIFICAR_MFA(codigo)` | Verificación puntual |
-| `CAMBIAR_PASSWORD(input)` | Cambia contraseña + valida MFA obligatorio |
+| `CAMBIAR_PASSWORD(input)` | Cambia contraseña con MFA obligatorio |
 
 ### Backup
 
 | Operación | Descripción |
 |---|---|
-| `GET_BACKUPS` | Lista backups disponibles |
+| `GET_BACKUPS` | Lista hasta 3 backups |
 | `GET_BACKUP_CONFIG` | Config del automático |
-| `CREAR_BACKUP(input)` | Backup manual con MFA |
-| `RESTAURAR_BACKUP(input)` | Restaura con MFA |
-| `CONFIGURAR_BACKUP_AUTO(input)` | Configura automático + ejecuta inicial |
+| `CREAR_BACKUP(input)` | Manual con MFA |
+| `RESTAURAR_BACKUP(input)` | Con MFA |
+| `CONFIGURAR_BACKUP_AUTO(input)` | Configura + ejecuta inicial |
 
-### Citas, sesiones, historial
+### Citas y sesiones
 
 | Operación | Descripción |
 |---|---|
-| `GET_CITAS_ESTUDIANTE(id_estudiante)` | Citas del estudiante con filtros |
-| `GET_AGENDA_PSICOLOGO(id_psicologo)` | Agenda del psicólogo |
-| `AGENDAR_CITA(input)` | Agenda una cita (id_estudiante del JWT) |
-| `CAMBIAR_ESTADO_CITA(id, input)` | Asistida / Cancelada |
-| `REGISTRAR_SESION(input)` | Registra sesión y marca cita ASISTIDA |
-| `GET_EXPEDIENTE(id_estudiante)` | Historial clínico completo |
+| `GET_CITAS_ESTUDIANTE(id)` | Citas del estudiante |
+| `GET_AGENDA_PSICOLOGO(id)` | Agenda del psicólogo |
+| `AGENDAR_CITA(input)` | id_estudiante del JWT |
+| `CAMBIAR_ESTADO_CITA(id, input)` | ASISTIDA / CANCELADA |
+| `REGISTRAR_SESION(input)` | Sesión + marca ASISTIDA |
+| `GET_EXPEDIENTE(id)` | Historial clínico completo |
 
 ---
 
 ## 15. Decisiones técnicas y bugs resueltos
 
-### Bug 1 — Iconos invisibles en botones de acción (admin Psicólogos)
+### Bug 1 — Iconos invisibles en botones (admin Psicólogos)
 
-**Síntoma:** Los botones de editar y eliminar aparecían sin ícono.
+**Causa:** Lucide React usa `stroke="currentColor"`. Botones `<button>` sin `type="button"` y sin `color` explícito heredan un color sobreescrito por resets del navegador.
 
-**Causa:** Lucide React renderiza SVG con `stroke="currentColor"`. Los elementos `<button>` sin `type="button"` y sin `color` explícito pueden heredar un color sobreescrito por resets del navegador, haciendo el stroke invisible.
-
-**Solución:** Tres capas de fix:
+**Solución (3 capas):**
 ```css
-/* CSS Module */
 .iconBtn { color: var(--cream-dim) !important; padding: 0; line-height: 0; }
 .iconBtn svg { stroke: currentColor; fill: none; }
 ```
 ```tsx
-{/* TSX */}
 <button type="button" style={{ color: 'var(--cream-dim)' }} className={styles.iconBtn}>
-  <Edit2 size={15} strokeWidth={1.8} />
-</button>
 ```
 
-### Bug 2 — Stats del dashboard mostraban `—` fijo
+### Bug 2 — Stats del dashboard con `—` fijo
 
-**Causa:** Los valores eran literales hardcodeados, no había queries al backend.
+**Causa:** Valores hardcodeados, sin queries reales al backend.
 
-**Solución:** Cada rol tiene su componente de stats propio (`AdminStats`, `PsicologoStats`, `EstudianteStats`) con sus queries correspondientes. Se usan queries "slim" para el conteo de psicólogos/estudiantes que solo piden el ID.
+**Solución:** Componentes `AdminStats`, `PsicologoStats`, `EstudianteStats` con sus propias queries. Las queries "slim" solo piden el ID para conteo eficiente.
 
-### Bug 3 — `TourStep` no exportable como valor en Vite ESM
+### Bug 3 — `TourStep` no exportable en Vite ESM
 
-**Síntoma:** `SyntaxError: The requested module does not provide an export named 'TourStep'`
+**Causa:** Las interfaces TypeScript no existen en runtime. Importarlas como valor lanza `SyntaxError`.
 
-**Causa:** `TourStep` es una interfaz TypeScript — solo existe en compilación, no en runtime. Vite ESM falla al intentar importarla como valor.
-
-**Solución:**
-```typescript
-import { TOUR_STEPS } from './tourSteps';
-import type { TourStep } from './tourSteps';   // ← import type
-```
+**Solución:** `import type { TourStep } from './tourSteps'`
 
 ### Bug 4 — Campos opcionales enviados como `""`
 
-**Síntoma:** El backend guardaba cadenas vacías en lugar de `NULL`.
+**Causa:** Estados de formulario inicializados en `""` se enviaban directamente.
 
-**Solución:** Funciones `strip()` y `clean()` que convierten `""` a `undefined` antes de cada mutation.
+**Solución:** `strip()` y `clean()` convierten `""` a `undefined` antes de mutations.
 
-### Bug 5 — Horarios con formato `"HH:MM"` en lugar de `"HH:MM:SS"`
+### Bug 5 — Horarios sin `:00` de segundos
 
-**Solución:** Función `toTimeDB()` en `Horarios.tsx`:
-```typescript
-function toTimeDB(t: string): string {
-  if (t.split(':').length === 2) return `${t}:00`;
-  return t;
-}
-```
+**Causa:** `TimePicker` devuelve `HH:MM`, la BD espera `HH:MM:SS`.
 
-### Bug 6 — MFA con toggle opcional en cambio de contraseña
+**Solución:** `toTimeDB()` en `Horarios.tsx`.
 
-**Problema de seguridad:** La versión anterior tenía un botón "Mi cuenta tiene MFA activo" que el usuario podía ignorar. Esto permitía cambiar la contraseña de otra persona si se conocía la contraseña actual.
+### Bug 6 — MFA opcional en cambio de contraseña (problema de seguridad)
 
-**Solución:** El código MFA es **siempre visible y requerido** en el modal de cambio de contraseña. El botón de envío queda deshabilitado hasta que el campo tenga exactamente 6 dígitos. No hay forma de omitirlo.
+**Versión anterior:** Toggle "Mi cuenta tiene MFA activo" — el usuario podía omitirlo.
 
-### Diseño del tour
+**Problema:** Cualquier persona con la contraseña actual podía cambiarla sin MFA.
 
-El overlay usa un SVG posicionado con `position: fixed` que dibuja un rectángulo negro a pantalla completa con una máscara que crea el "hueco" sobre el elemento destacado. Se re-mide el elemento con `getBoundingClientRect()` en `useLayoutEffect` con un re-intento de 350ms para capturar posiciones después del scroll inicial. El viewport se escucha con `resize` para recalcular posiciones cuando el usuario cambia el tamaño de la ventana.
+**Solución:** Código MFA siempre visible, siempre requerido. Botón deshabilitado hasta 6 dígitos completos.
+
+### Bug 7 — Error de MFA persistía al corregir el código
+
+**Causa:** `error` de `useMutation` de Apollo no se limpia al cambiar estados locales — solo cuando la mutation se vuelve a ejecutar exitosamente.
+
+**Solución:** Estado local `backupError` que se limpia en `onChange` del input de código MFA.
+
+### Bug 8 — TypeScript errors en Backup.tsx
+
+Tres errores que impedían compilar:
+1. `useCallback` importado pero sin usar → eliminado del import
+2. `lC` (loading de config) desestructurado pero sin referenciar → eliminado
+3. `Field` no acepta prop `style` → envuelto en `<div style={...}>` externo
 
 ---
 
@@ -469,7 +487,7 @@ El overlay usa un SVG posicionado con `position: fixed` que dibuja un rectángul
 | Comando | Descripción |
 |---|---|
 | `npm install --legacy-peer-deps` | Instalar dependencias |
-| `npm run dev` | Servidor de desarrollo en `localhost:5173` |
-| `npm run build` | Compilar para producción en `dist/` |
-| `npm run preview` | Previsualizar el build de producción |
-| `npm run lint` | Ejecutar ESLint |
+| `npm run dev` | Desarrollo en `localhost:5173` |
+| `npm run build` | Compilar a `dist/` |
+| `npm run preview` | Previsualizar build |
+| `npm run lint` | ESLint |

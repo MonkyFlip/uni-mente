@@ -5,6 +5,7 @@ import { BackupLog } from './entities/backup-log.entity';
 import { BackupConfig } from './entities/backup-config.entity';
 import { BackupService } from './backup.service';
 import { BackupResolver } from './backup.resolver';
+import { EmergencyRestoreController } from './emergency-restore.controller';
 import { MfaModule } from '../mfa/mfa.module';
 
 @Module({
@@ -13,7 +14,8 @@ import { MfaModule } from '../mfa/mfa.module';
     TypeOrmModule.forFeature([BackupLog, BackupConfig]),
     MfaModule,
   ],
-  providers: [BackupService, BackupResolver],
-  exports: [BackupService],
+  controllers: [EmergencyRestoreController],
+  providers:   [BackupService, BackupResolver],
+  exports:     [BackupService],
 })
 export class BackupModule {}

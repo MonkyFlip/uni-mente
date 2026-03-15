@@ -18,6 +18,7 @@ import RegistrarPsicologo from './pages/admin/RegistrarPsicologo';
 import AdminPsicologos    from './pages/admin/Psicologos';
 import BackupPage         from './pages/admin/Backup';
 import MfaConfig          from './pages/admin/MfaConfig';
+import EmergencyRestore   from './pages/admin/EmergencyRestore';
 
 /** Wrap authenticated app with TourProvider that knows the user's role */
 function AppWithTour() {
@@ -28,6 +29,7 @@ function AppWithTour() {
       <Routes>
         <Route path="/login"    element={<Login />} />
         <Route path="/registro" element={<Registro />} />
+        <Route path="/emergency-restore" element={<EmergencyRestore />} />
         <Route path="/"         element={<Navigate to="/login" replace />} />
 
         <Route path="/dashboard"  element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />

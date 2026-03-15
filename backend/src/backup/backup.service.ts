@@ -1,5 +1,5 @@
 import {
-  Injectable, NotFoundException, Logger, OnModuleInit,
+  Injectable, NotFoundException, BadRequestException, Logger, OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
@@ -70,9 +70,16 @@ function toJson(val: any): any {
 
 /** Genera nombre de archivo con timestamp */
 function buildFilename(tipo: string, formato: string): string {
-  const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-  const ext = formato === 'EXCEL' ? 'xlsx' : formato.toLowerCase();
-  return `backup_${tipo}_${ts}.${ext}`;
+  const now  = new Date();
+  const dia  = String(now.getDate()).padStart(2, '0');
+  const mes  = String(now.getMonth() + 1).padStart(2, '0');
+  const anio = now.getFullYear();
+  const hrs  = now.getHours();
+  const min  = String(now.getMinutes()).padStart(2, '0');
+  const ampm = hrs >= 12 ? 'pm' : 'am';
+  const h12  = String(hrs % 12 || 12).padStart(2, '0');
+  const ext  = formato === 'EXCEL' ? 'xlsx' : formato.toLowerCase();
+  return `backup_${tipo}_${dia}-${mes}-${anio}_${h12}-${min}${ampm}.${ext}`;
 }
 
 @Injectable()
@@ -495,6 +502,28 @@ export class BackupService implements OnModuleInit {
     } finally {
       await this.dataSource.query('SET FOREIGN_KEY_CHECKS = 1');
     }
+  }
+
+  // ─── Restauración de emergencia (BD vacía, sin JWT) ─────────────────────────
+
+  async restaurarEmergencia(id_backup: number): Promise<void> {
+    const registro = await this.logRepo.findOneBy({ id_backup });
+    if (!registro) throw new NotFoundException(`Backup #${id_backup} no encontrado.`);
+    const filePath = join(BACKUP_DIR, registro.nombre_archivo);
+    if (!existsSync(filePath)) throw new NotFoundException(`Archivo no encontrado: ${registro.nombre_archivo}`);
+    await this.restaurarArchivo(filePath, registro.formato, registro.tipo);
+  }
+
+  async restaurarEmergenciaPorArchivo(nombre_archivo: string): Promise<void> {
+    const filePath = join(BACKUP_DIR, nombre_archivo);
+    if (!existsSync(filePath)) throw new NotFoundException(`Archivo no encontrado en Backup/: ${nombre_archivo}`);
+    const ext = nombre_archivo.split('.').pop()?.toLowerCase() ?? '';
+    const formatMap: Record<string, string> = { sql:'SQL', json:'JSON', xlsx:'EXCEL', csv:'CSV' };
+    const formato = formatMap[ext];
+    if (!formato) throw new BadRequestException(`Extensión no soportada: .${ext}`);
+    const tipo = nombre_archivo.includes('COMPLETO') ? 'COMPLETO'
+               : nombre_archivo.includes('DIFERENCIAL') ? 'DIFERENCIAL' : 'INCREMENTAL';
+    await this.restaurarArchivo(filePath, formato, tipo);
   }
 
   // ─── Mantener solo los 3 últimos backups ──────────────────────────

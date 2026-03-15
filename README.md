@@ -6,7 +6,7 @@ Portal de Bienestar Universitario — Sistema integral de gestión de atención 
 
 ## Descripción del sistema
 
-UniMente cubre el ciclo completo de atención psicológica universitaria: agendamiento de citas, registro de sesiones clínicas, mantenimiento de historial del paciente, sistema de respaldos de base de datos y autenticación de dos factores (MFA).
+UniMente cubre el ciclo completo de atención psicológica universitaria: agendamiento de citas, registro de sesiones clínicas, mantenimiento de historial del paciente, autenticación de dos factores (MFA) y sistema de respaldos de base de datos con protocolo de restauración de emergencia.
 
 ---
 
@@ -33,7 +33,7 @@ UniMente cubre el ciclo completo de atención psicológica universitaria: agenda
 
 **Instalar Node.js**
 
-Windows / macOS: https://nodejs.org (instalador LTS)
+Windows / macOS: https://nodejs.org
 
 Linux (Ubuntu / Debian):
 ```bash
@@ -52,7 +52,7 @@ git clone https://github.com/MonkyFlip/uni-mente.git
 cd uni-mente
 ```
 
-### 2. Instalar dependencias del backend
+### 2. Backend
 
 ```bash
 cd backend
@@ -61,22 +61,30 @@ npm install speakeasy qrcode exceljs @nestjs/schedule --legacy-peer-deps
 npm install @types/speakeasy @types/qrcode --save-dev --legacy-peer-deps
 ```
 
-### 3. Configurar variables de entorno del backend
-
 Crear `backend/.env`:
 
 ```env
+# ─── Base de datos MySQL ─────────────────────────────────────────
 DB_HOST=localhost
 DB_PORT=3306
 DB_USER=root
 DB_PASSWORD=tu_password_aqui
 DB_NAME=unimente
+DB_SYNCHRONIZE=false
 
-JWT_SECRET=unimente_super_secret_2024
+# ─── Autenticación JWT ───────────────────────────────────────────
+JWT_SECRET=cambia_este_secreto_en_produccion
 JWT_EXPIRES=8h
+
+# ─── Restauración de emergencia ──────────────────────────────────
+RESTORE_SECRET=UniMente_Restore_2024_SuperSecreta
+
+# ─── Servidor ────────────────────────────────────────────────────
+PORT=3000
+NODE_ENV=development
 ```
 
-### 4. Instalar dependencias del frontend
+### 3. Frontend
 
 ```bash
 cd ../frontend
@@ -87,16 +95,14 @@ npm install --legacy-peer-deps
 
 ## Iniciar el proyecto
 
-Abre **dos terminales** simultáneas:
+Abre **dos terminales**:
 
-**Terminal 1 — Backend:**
 ```bash
+# Terminal 1 — Backend
 cd uni-mente/backend
 npm run start:dev
-```
 
-**Terminal 2 — Frontend:**
-```bash
+# Terminal 2 — Frontend
 cd uni-mente/frontend
 npm run dev
 ```
@@ -105,23 +111,23 @@ npm run dev
 |---|---|
 | Aplicación web | http://localhost:5173 |
 | API GraphQL | http://localhost:3000/graphql |
-| Apollo Sandbox | http://localhost:3000/graphql (abrir en navegador) |
+| Apollo Sandbox | http://localhost:3000/graphql (en navegador) |
+| Restauración emergencia | http://localhost:5173/emergency-restore |
 
 ### Primera ejecución
 
 Al levantar el backend por primera vez:
 
-1. Crea automáticamente la base de datos `unimente` si no existe
+1. Crea la BD `unimente` si no existe
 2. Crea todas las tablas con `CREATE TABLE IF NOT EXISTS`
-3. Detecta que la BD está vacía y ejecuta el seed automáticamente
-4. Genera ~1 100 registros de prueba bien relacionados
+3. Ejecuta el seed automáticamente (BD vacía)
+4. Genera ~1 100 registros de prueba + 4 administradores
 
-Salida esperada en consola:
 ```
 Base de datos inicializada correctamente.
 BD vacía — ejecutando seed de datos de prueba...
   Seed completado:
-    Psicologos: 12  |  Horarios: 42  |  Estudiantes: 80
+    Psicologos: 12  |  Horarios: ~42  |  Estudiantes: 80
     Citas: ~450  |  Sesiones: ~240  |  Historiales: ~90
 UniMente Backend corriendo en http://localhost:3000/graphql
 ```
@@ -134,14 +140,14 @@ UniMente Backend corriendo en http://localhost:3000/graphql
 
 | Nombre | Correo | Contraseña |
 |---|---|---|
-| Administrador (principal) | admin@unimente.edu | Admin1234! |
+| Administrador principal | admin@unimente.edu | Admin1234! |
 | Brenda Admin | brendaAdmin@unimente.com | Brenda123! |
 | Abril Admin | abrilAdmin@unimente.com | Abril123! |
 | Mai Admin | maiAdmin@unimente.com | Mai123! |
 
-Los admins del equipo se agregan ejecutando el SQL en `generar_hashes_admin.js`. Cada admin puede configurar su propio MFA independiente desde `/admin/mfa`.
+Cada admin puede configurar su propio MFA independiente desde `/admin/mfa`.
 
-### Datos de prueba (generados por el seed)
+### Datos de prueba del seed
 
 | Rol | Correo | Contraseña |
 |---|---|---|
@@ -155,42 +161,36 @@ Los admins del equipo se agregan ejecutando el SQL en `generar_hashes_admin.js`.
 ```
 uni-mente/
 ├── backend/
-│   ├── Backup/                      # Archivos de respaldo (auto-creada)
+│   ├── Backup/                        # Archivos de respaldo (auto-creada)
 │   ├── src/
-│   │   ├── app.module.ts            # Init BD + seed automático + ScheduleModule
-│   │   ├── database/
-│   │   │   └── init.sql             # CREATE IF NOT EXISTS + migración MFA
-│   │   ├── seed/
-│   │   │   └── seed.ts              # ~1 100 registros con admin real bcrypt
-│   │   ├── mfa/                     # TOTP con speakeasy + QR
-│   │   ├── backup/                  # SQL/JSON/CSV/Excel + scheduler automático
-│   │   ├── auth/
-│   │   ├── cita/
-│   │   ├── sesion/
-│   │   ├── historial-clinico/
-│   │   ├── psicologo/
-│   │   ├── estudiante/
-│   │   └── ...
+│   │   ├── app.module.ts              # Init BD + seed + ScheduleModule
+│   │   ├── database/init.sql          # CREATE IF NOT EXISTS + migración MFA
+│   │   ├── seed/seed.ts               # ~1 100 registros + 4 admins bcrypt
+│   │   ├── mfa/                       # TOTP window=2, coerción TINYINT
+│   │   └── backup/
+│   │       ├── backup.service.ts      # Tipos, formatos, scheduler, emergencia
+│   │       ├── backup.resolver.ts     # GraphQL — solo admin autenticado
+│   │       ├── emergency-restore.controller.ts  # REST — sin JWT, BD vacía
+│   │       └── dto/backup.dto.ts      # @IsOptional + @IsString en codigo_mfa
 │   └── .env
 │
 ├── frontend/
 │   ├── src/
-│   │   ├── App.tsx                  # Rutas + providers + TourProvider
-│   │   ├── tours/                   # Guía interactiva por rol
-│   │   ├── components/
-│   │   │   └── UI.tsx               # Pagination + usePagination hook
-│   │   ├── graphql/
-│   │   │   └── operations.ts        # Queries y mutations (MFA + Backup)
+│   │   ├── App.tsx                    # Rutas + TourProvider + ruta emergencia
+│   │   ├── tours/                     # Guía interactiva por rol
+│   │   ├── components/UI.tsx          # Pagination + usePagination
+│   │   ├── graphql/operations.ts      # Auth + MFA + Backup + Citas
 │   │   └── pages/
-│   │       ├── Login.tsx            # Login + cambio de contraseña con MFA
+│   │       ├── Login.tsx              # Modal cambio pwd con MFA obligatorio
 │   │       ├── admin/
-│   │       │   ├── Backup.tsx       # Modal MFA para confirmar respaldos
-│   │       │   └── MfaConfig.tsx    # Activar/desactivar TOTP
+│   │       │   ├── Backup.tsx         # Modal MFA antes de crear backup
+│   │       │   ├── MfaConfig.tsx      # Activar/desactivar TOTP
+│   │       │   └── EmergencyRestore.tsx  # Panel sin login para BD vacía
 │   │       ├── estudiante/
 │   │       └── psicologo/
-│   └── .env
+│   └── .env (opcional)
 │
-├── generar_hashes_admin.js          # Script para generar INSERT de admins
+├── generar_hashes_admin.js            # Script para INSERT de admins extras
 ├── BACKEND.md
 ├── FRONTEND.md
 └── README.md
@@ -204,52 +204,60 @@ uni-mente/
 
 ```
 1. Login → /dashboard (guía automática en primer acceso)
-2. /psicologos → buscar por nombre o especialidad
-3. Clic en "Agendar cita" → seleccionar horario → elegir fecha
-4. Solo se muestran fechas del día de la semana del horario elegido
-5. Motivo opcional → Confirmar → Cita PENDIENTE creada
+2. /psicologos → buscar por nombre o especialidad (paginado)
+3. Clic "Agendar cita" → seleccionar horario
+4. Elegir fecha (solo días de semana del horario elegido)
+5. Motivo opcional → Confirmar → Cita PENDIENTE
 ```
 
 ### Psicólogo registra una sesión
 
 ```
 1. Login → /agenda
-2. Ver citas PENDIENTE → clic en "Sesión"
-3. Llenar notas y recomendaciones → Guardar
-4. Backend en transacción única:
-   - INSERT Sesion
-   - UPDATE Cita SET estado = 'ASISTIDA'
-   - CREATE OR UPDATE Historial_Clinico
-   - INSERT Detalle_Historial
+2. Ver citas PENDIENTE → clic "Sesión"
+3. Llenar notas y recomendaciones
+4. Transacción única en el backend:
+   INSERT Sesion
+   UPDATE Cita SET estado = 'ASISTIDA'
+   FIND OR CREATE Historial_Clinico
+   INSERT Detalle_Historial
 ```
 
 ### Administrador crea un respaldo
 
 ```
-1. Login → /admin/backup
-2. Seleccionar tipo (COMPLETO / DIFERENCIAL / INCREMENTAL)
-3. Seleccionar formato (SQL / JSON / EXCEL / CSV)
-4. Clic en "Crear respaldo" → modal de confirmación
-5. Ingresar código MFA de 6 dígitos (si está configurado)
-6. Backup creado en backend/Backup/
+1. /admin/backup → seleccionar tipo y formato
+2. Clic "Crear respaldo" → abre modal de confirmación
+3. Ingresar código MFA de 6 dígitos (obligatorio)
+4. Confirmar → archivo guardado en backend/Backup/
 ```
 
-### Administrador configura MFA
+### Configurar MFA
 
 ```
-1. /admin/mfa → Clic en "Activar MFA"
-2. Escanear QR con Google Authenticator o Microsoft Authenticator
-3. Ingresar código de 6 dígitos para confirmar sincronización
+1. /admin/mfa → Clic "Activar MFA"
+2. Escanear QR con Google/Microsoft Authenticator
+3. Ingresar primer código de 6 dígitos para confirmar
 4. MFA activo — respaldos y restauraciones requerirán código
 ```
 
-### Cambio de contraseña (desde Login)
+### Cambiar contraseña
 
 ```
-1. Página /login → botón "Cambiar contraseña"
-2. Ingresar: correo + contraseña actual + nueva contraseña
-3. Ingresar código MFA de 6 dígitos (SIEMPRE obligatorio)
+1. /login → botón "Cambiar contraseña"
+2. Correo + contraseña actual + nueva contraseña
+3. Código MFA de 6 dígitos (siempre obligatorio)
 4. Contraseña actualizada
+```
+
+### Restauración de emergencia (BD vacía)
+
+```
+1. http://localhost:5173/emergency-restore
+2. Ingresar RESTORE_SECRET del .env del servidor
+3. ID del backup o nombre del archivo (en backend/Backup/)
+4. Backend verifica: BD vacía + clave correcta → restaura
+5. /login con credenciales normales
 ```
 
 ---
@@ -258,15 +266,19 @@ uni-mente/
 
 ### Guía interactiva del sistema
 
-Al iniciar sesión por primera vez, se activa automáticamente una guía visual que recorre todas las funcionalidades del portal según el rol del usuario. Incluye overlay con recorte sobre el elemento destacado, tooltip animado con barra de progreso y botón de saltar. El botón **"Guía del sistema"** en la barra lateral permite relanzarla en cualquier momento.
+Se activa automáticamente en el primer login de cada usuario. El botón **"Guía del sistema"** en la barra lateral la relanza en cualquier momento. 7 pasos por rol, con overlay SVG y tooltip animado. Estado guardado en `localStorage` por rol.
 
-### Paginación
+### Paginación universal
 
-Todas las vistas con listas largas tienen paginación integrada. El componente `Pagination` muestra el rango de registros, botones de navegación y números de página con puntos suspensivos. Al filtrar o buscar, la lista regresa automáticamente a la página 1.
+Todas las listas tienen paginación. El componente `Pagination` muestra el rango de registros, navegación por páginas y ellipsis automático. Al filtrar o buscar, la lista vuelve automáticamente a la página 1.
 
 ### Sistema de respaldos
 
-Soporta tres tipos (Completo, Diferencial, Incremental) en cuatro formatos (SQL, JSON, Excel, CSV). Se mantienen solo los 3 respaldos más recientes — los anteriores se eliminan automáticamente. El backup automático puede configurarse con una frecuencia desde 1 hora hasta 30 días, y ejecuta un respaldo de seguridad inmediatamente al ser configurado.
+Tipos: Completo, Diferencial, Incremental. Formatos: SQL, JSON, Excel, CSV. Máximo 3 backups — los más antiguos se eliminan automáticamente. El backup automático ejecuta un respaldo inmediato al configurarse. MFA obligatorio para todas las operaciones.
+
+### Protocolo de restauración de emergencia
+
+Endpoint REST `POST /api/emergency-restore` protegido por `RESTORE_SECRET` del `.env`. Solo activo cuando la BD tiene 0 usuarios. Permite restaurar sin JWT cuando la BD fue eliminada o corrompida.
 
 ---
 
@@ -274,22 +286,30 @@ Soporta tres tipos (Completo, Diferencial, Incremental) en cuatro formatos (SQL,
 
 ### `estado` como VARCHAR en Cita
 
-La columna `Cita.estado` es `VARCHAR(20)` en MySQL, no `ENUM`. TypeORM tiene un bug donde el mapeo de columnas ENUM puede devolver valores vacíos después de un raw SQL update. Combined con `@Field(() => EstadoCita)` en NestJS GraphQL produce `Enum "EstadoCita" cannot represent value: ""`. La solución usa `VARCHAR` en BD, `string` en TypeORM, `@Field()` sin tipo explícito en el output, y SQL directo para escrituras.
+`Cita.estado` es `VARCHAR(20)`, no `ENUM`. TypeORM con columnas ENUM puede devolver valores vacíos después de raw SQL updates, causando `Enum "EstadoCita" cannot represent value: ""` en GraphQL. Solución: VARCHAR + `@Field()` sin tipo explícito + SQL directo para escrituras.
 
 ### MFA siempre requerido en cambio de contraseña
 
-El modal de cambio de contraseña no tiene opción de omitir el código MFA. Esto previene que alguien con acceso físico al dispositivo o conocimiento de la contraseña actual pueda cambiarla sin autorización del dueño de la cuenta.
+Sin excepción ni toggle. Previene que alguien con acceso físico al dispositivo cambie la contraseña de otra persona aunque conozca la contraseña actual.
 
-### Seed con admin de bcrypt real
+### MFA obligatorio para backups
 
-El `init.sql` ya no incluye un hash hardcodeado del admin. El seed genera el hash con `bcrypt.hash('Admin1234!', 10)` en runtime, garantizando que el hash siempre coincide con la contraseña real.
+Si la cuenta no tiene MFA configurado, el backend rechaza la operación de backup con mensaje que indica ir a `/admin/mfa`. No hay alternativa de `000000` ni bypass.
+
+### Doble capa de error en modales MFA
+
+Los modales de backup usan estado local `backupError` en lugar del `error` del hook de Apollo, para poder limpiarlo instantáneamente cuando el usuario modifica el código sin necesidad de volver a ejecutar la mutation.
+
+### Seed con todos los admins
+
+El seed crea los 4 administradores del equipo con hashes bcrypt generados en runtime. No hay hashes hardcodeados en el código.
 
 ---
 
 ## Documentación completa
 
-- [BACKEND.md](./BACKEND.md) — Arquitectura, API GraphQL, MFA, sistema de respaldos, bugs resueltos
-- [FRONTEND.md](./FRONTEND.md) — Componentes, rutas, tour, paginación, decisiones técnicas
+- [BACKEND.md](./BACKEND.md) — Arquitectura, API GraphQL, MFA, respaldos, emergencia, bugs
+- [FRONTEND.md](./FRONTEND.md) — Componentes, rutas, tour, paginación, módulos, bugs
 
 ---
 
@@ -299,23 +319,19 @@ El `init.sql` ya no incluye un hash hardcodeado del admin. El seed genera el has
 # Clonar e instalar
 git clone https://github.com/MonkyFlip/uni-mente.git
 cd uni-mente/backend  && npm install --legacy-peer-deps
+npm install speakeasy qrcode exceljs @nestjs/schedule --legacy-peer-deps
 cd ../frontend        && npm install --legacy-peer-deps
 
-# Paquetes adicionales del backend
-cd ../backend
-npm install speakeasy qrcode exceljs @nestjs/schedule --legacy-peer-deps
-
 # Levantar
-cd backend  && npm run start:dev   # Terminal 1
-cd frontend && npm run dev         # Terminal 2
+cd ../backend  && npm run start:dev   # Terminal 1
+cd ../frontend && npm run dev         # Terminal 2
 
 # Reiniciar datos de prueba
 cd backend
-npm run seed                                              # macOS / Linux
-npx ts-node -r tsconfig-paths/register src\seed\seed.ts  # Windows
+npm run seed                                               # macOS / Linux
+npx ts-node -r tsconfig-paths/register src\seed\seed.ts   # Windows
 
-# Agregar admins del equipo (genera SQL con hashes reales)
-cd backend
+# Agregar admins del equipo (si no usas el seed)
 node generar_hashes_admin.js
-# → copiar los INSERT y ejecutar en MySQL
+# Copiar los INSERT generados y ejecutar en MySQL
 ```

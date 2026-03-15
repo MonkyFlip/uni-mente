@@ -308,8 +308,8 @@ El seed crea los 4 administradores del equipo con hashes bcrypt generados en run
 
 ## Documentación completa
 
-- [BACKEND.md](./BACKEND.md) — Arquitectura, API GraphQL, MFA, respaldos, emergencia, bugs
-- [FRONTEND.md](./FRONTEND.md) — Componentes, rutas, tour, paginación, módulos, bugs
+- [BACKEND.md](./backend/BACKEND.md) — Arquitectura, API GraphQL, MFA, respaldos, emergencia, bugs
+- [FRONTEND.md](./frontend/FRONTEND.md) — Componentes, rutas, tour, paginación, módulos, bugs
 
 ---
 

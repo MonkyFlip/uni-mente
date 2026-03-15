@@ -66,7 +66,7 @@ export class MfaService {
   async deshabilitarMfa(id_usuario: number, codigo: string): Promise<boolean> {
     const usuario = await this.findUsuario(id_usuario);
 
-    if (!usuario.mfa_enabled) {
+    if (Number(usuario.mfa_enabled) !== 1 || !usuario.mfa_secret) {
       throw new BadRequestException('MFA ya está deshabilitado en esta cuenta.');
     }
     if (!this.verifyCode(usuario.mfa_secret!, codigo)) {
@@ -84,17 +84,36 @@ export class MfaService {
 
   /**
    * Verifica un código MFA para el usuario dado.
-   * Lanza UnauthorizedException si el código es incorrecto.
+   * MFA es OBLIGATORIO para operaciones sensibles (respaldos, restauraciones).
+   * Si la cuenta no tiene MFA configurado, la operación es rechazada.
    */
   async requireMfa(id_usuario: number, codigo?: string): Promise<void> {
     const usuario = await this.findUsuario(id_usuario);
-    if (!usuario.mfa_enabled) return; // MFA no activo, no se requiere
 
-    if (!codigo) {
-      throw new UnauthorizedException('Esta operación requiere un código MFA.');
+    // MySQL TINYINT puede devolver 0/1 en lugar de false/true
+    const mfaActivo = Number(usuario.mfa_enabled) === 1 && !!usuario.mfa_secret;
+
+    // MFA no configurado — la operación no puede completarse
+    if (!mfaActivo) {
+      throw new UnauthorizedException(
+        'Debes configurar MFA antes de realizar respaldos o restauraciones. ' +
+        'Ve a Seguridad MFA y activa la autenticación de dos factores.',
+      );
     }
-    if (!this.verifyCode(usuario.mfa_secret!, codigo)) {
-      throw new UnauthorizedException('Código MFA inválido o expirado.');
+
+    // MFA activo — validar código
+    const codigoLimpio = (codigo ?? '').trim().replace(/\s/g, '');
+
+    if (!codigoLimpio || codigoLimpio.length !== 6) {
+      throw new UnauthorizedException(
+        'Ingresa el código de 6 dígitos de tu app autenticadora (Google Authenticator o Microsoft Authenticator).',
+      );
+    }
+
+    if (!this.verifyCode(usuario.mfa_secret!, codigoLimpio)) {
+      throw new UnauthorizedException(
+        'Código MFA incorrecto o expirado. Los códigos cambian cada 30 segundos — intenta de nuevo.',
+      );
     }
   }
 
@@ -117,7 +136,7 @@ export class MfaService {
     }
 
     // 2. Verificar MFA si está habilitado
-    if (usuario.mfa_enabled) {
+    if (Number(usuario.mfa_enabled) === 1 && usuario.mfa_secret) {
       if (!input.codigo_mfa) {
         throw new UnauthorizedException('Tu cuenta tiene MFA activo. Incluye el código de 6 dígitos.');
       }
@@ -136,7 +155,7 @@ export class MfaService {
 
   async obtenerEstadoMfa(id_usuario: number): Promise<{ mfa_enabled: boolean }> {
     const u = await this.findUsuario(id_usuario);
-    return { mfa_enabled: u.mfa_enabled ?? false };
+    return { mfa_enabled: Number(u.mfa_enabled) === 1 };
   }
 
   // ─── Helpers privados ─────────────────────────────────────────────
@@ -149,11 +168,13 @@ export class MfaService {
 
   /** TOTP verify con ventana de ±30 s */
   verifyCode(secret: string, codigo: string): boolean {
+    const token = codigo.replace(/\s/g, '').replace(/\D/g, '');
+    if (token.length !== 6) return false;
     return speakeasy.totp.verify({
       secret,
       encoding: 'base32',
-      token:    codigo.replace(/\s/g, ''),
-      window:   1,
+      token,
+      window:   2,   // tolerancia de ±60 s para desfase de reloj
     });
   }
 }

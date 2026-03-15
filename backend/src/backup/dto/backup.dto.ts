@@ -1,5 +1,5 @@
 import { InputType, Field, Int } from '@nestjs/graphql';
-import { IsIn, IsInt, Min, Max, IsString, Length } from 'class-validator';
+import { IsIn, IsInt, Min, Max, IsString, Length, IsOptional } from 'class-validator';
 
 const TIPOS    = ['COMPLETO', 'DIFERENCIAL', 'INCREMENTAL'] as const;
 const FORMATOS = ['SQL', 'JSON', 'EXCEL', 'CSV'] as const;
@@ -14,8 +14,10 @@ export class CreateBackupInput {
   @IsIn(FORMATOS, { message: 'formato debe ser SQL, JSON, EXCEL o CSV' })
   formato: string;
 
-  /** Código MFA de 6 dígitos (requerido si la cuenta tiene MFA activo) */
+  /** Código MFA de 6 dígitos — obligatorio para cuentas con MFA activo */
   @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
   codigo_mfa?: string;
 }
 

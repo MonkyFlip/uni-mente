@@ -130,7 +130,7 @@ function CambiarPasswordModal({
           <div className={pwdStyles.mfaBlock}>
             <div className={pwdStyles.mfaLabelRow}>
               <KeyRound size={14} style={{ color: 'var(--teal)' }} />
-              <span>Ingresa el código de 6 dígitos de tu app autenticadora</span>
+              <span>Código de 6 dígitos de tu app autenticadora</span>
             </div>
             <input
               type="text"
@@ -140,10 +140,16 @@ function CambiarPasswordModal({
               onChange={e => setCodigoMfa(e.target.value.replace(/\D/g, ''))}
               placeholder="1  2  3  4  5  6"
               className={pwdStyles.codeInput}
+              autoFocus
               required
             />
             {codigoMfa.length > 0 && codigoMfa.length < 6 && (
-              <span className={pwdStyles.codeHint}>Ingresa los 6 dígitos completos</span>
+              <span className={pwdStyles.codeHint}>Faltan {6 - codigoMfa.length} dígitos</span>
+            )}
+            {codigoMfa.length === 0 && (
+              <span className={pwdStyles.codeNote}>
+                Si aún no configuraste MFA, ve primero a Seguridad MFA y actívalo.
+              </span>
             )}
           </div>
         </Field>

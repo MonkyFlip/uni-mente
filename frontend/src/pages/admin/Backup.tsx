@@ -52,7 +52,7 @@ function fmtKb(kb: number | null) {
 
 export default function Backup() {
   const { data: dataBackups, loading: lB, refetch: rB } = useQuery(GET_BACKUPS,       { fetchPolicy: 'network-only' });
-  const { data: dataConfig,  loading: lC, refetch: rC } = useQuery(GET_BACKUP_CONFIG, { fetchPolicy: 'network-only' });
+  const { data: dataConfig,  refetch: rC } = useQuery(GET_BACKUP_CONFIG, { fetchPolicy: 'network-only' });
 
   const backups: any[] = dataBackups?.listarBackups ?? [];
   const config: any    = dataConfig?.configBackupAutomatico ?? null;
@@ -64,6 +64,7 @@ export default function Backup() {
   // ── Modal: confirmar backup con MFA ───────────────────────────
   const [showConfirmBackup, setShowConfirmBackup] = useState(false);
   const [confirmMfa,        setConfirmMfa]        = useState('');
+  const [backupError,       setBackupError]       = useState('');
 
   // ── Modal: configuración automática ──────────────────────────
   const [showAuto,    setShowAuto]    = useState(false);
@@ -80,12 +81,16 @@ export default function Backup() {
   const ok = (msg: string) => { setSuccessMsg(msg); setTimeout(() => setSuccessMsg(''), 5000); };
 
   // ── Mutations ─────────────────────────────────────────────────
-  const [crearBackup, { loading: creating, error: errCreate }] = useMutation(CREAR_BACKUP, {
+  const [crearBackup, { loading: creating }] = useMutation(CREAR_BACKUP, {
     onCompleted: (d) => {
       ok(`Backup creado: ${d.crearBackup.nombre_archivo} (${fmtKb(d.crearBackup.tamanio_kb)})`);
       setShowConfirmBackup(false);
       setConfirmMfa('');
+      setBackupError('');
       rB();
+    },
+    onError: (e) => {
+      setBackupError(e.message.replace('GraphQL error: ', ''));
     },
   });
 
@@ -113,14 +118,21 @@ export default function Backup() {
   /** El botón de crear abre el modal de confirmación MFA */
   const handleClickCrear = () => {
     setConfirmMfa('');
+    setBackupError('');
     setShowConfirmBackup(true);
   };
 
-  /** Confirmación desde el modal */
+  /** Confirmación desde el modal — siempre envía codigo_mfa */
   const handleConfirmBackup = () => {
-    const input: any = { tipo: manTipo, formato: manFormato };
-    if (confirmMfa.trim()) input.codigo_mfa = confirmMfa.trim();
-    crearBackup({ variables: { input } });
+    crearBackup({
+      variables: {
+        input: {
+          tipo:       manTipo,
+          formato:    manFormato,
+          codigo_mfa: confirmMfa.trim() !== '' ? confirmMfa.trim() : undefined,
+        },
+      },
+    });
   };
 
   const handleAuto = (e: React.FormEvent) => {
@@ -302,10 +314,10 @@ export default function Backup() {
       {/* ══ Modal: Confirmar backup con MFA ══════════════════════ */}
       <Modal
         open={showConfirmBackup}
-        onClose={() => { setShowConfirmBackup(false); setConfirmMfa(''); }}
+        onClose={() => { setShowConfirmBackup(false); setConfirmMfa(''); setBackupError(''); }}
         title="Confirmar respaldo"
       >
-        {errCreate && <Alert message={errCreate.message.replace('GraphQL error: ', '')} />}
+        {backupError && <Alert message={backupError} />}
 
         {/* Resumen de lo que se va a crear */}
         <div className={styles.confirmSummary}>
@@ -337,7 +349,7 @@ export default function Backup() {
           </div>
           <p className={styles.mfaHint}>
             Ingresa el código de 6 dígitos de tu app autenticadora para autorizar esta operación.
-            Si aún no has configurado MFA, deja este campo vacío.
+            Este paso es obligatorio — debes tener MFA configurado en tu cuenta.
           </p>
           <input
             type="text"
@@ -345,7 +357,7 @@ export default function Backup() {
             maxLength={6}
             autoFocus
             value={confirmMfa}
-            onChange={e => setConfirmMfa(e.target.value.replace(/\D/g, ''))}
+            onChange={e => { setConfirmMfa(e.target.value.replace(/\D/g, '')); setBackupError(''); }}
             placeholder="123456"
             className={styles.mfaInputLarge}
           />
@@ -355,12 +367,13 @@ export default function Backup() {
           <Button
             variant="secondary"
             style={{ flex: 1 }}
-            onClick={() => { setShowConfirmBackup(false); setConfirmMfa(''); }}
+            onClick={() => { setShowConfirmBackup(false); setConfirmMfa(''); setBackupError(''); }}
           >
             Cancelar
           </Button>
           <Button
             loading={creating}
+            disabled={confirmMfa.length !== 6}
             style={{ flex: 2 }}
             icon={<Download size={15} />}
             onClick={handleConfirmBackup}
@@ -432,7 +445,7 @@ export default function Backup() {
             </div>
           </div>
         </div>
-        <Field label="Código MFA para confirmar" style={{ marginTop: 16 }}>
+        <div style={{ marginTop: 16 }}><Field label="Código MFA (obligatorio)">
           <input
             type="text" inputMode="numeric" maxLength={6} autoFocus
             value={restoreMfa}
@@ -440,7 +453,7 @@ export default function Backup() {
             placeholder="123456"
             className={styles.mfaInput}
           />
-        </Field>
+        </Field></div>
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
           <Button variant="secondary" onClick={() => setRestoreTarget(null)}>Cancelar</Button>
           <Button variant="danger" loading={restoring} disabled={restoreMfa.length !== 6}

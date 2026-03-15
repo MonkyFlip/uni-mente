@@ -106,12 +106,24 @@ export async function runSeed(conn: mysql.Connection): Promise<void> {
   const id_rol_psi = await getId(conn, "SELECT id_rol FROM Rol WHERE nombre='psicologo'",     []);
   const id_rol_est = await getId(conn, "SELECT id_rol FROM Rol WHERE nombre='estudiante'",    []);
 
-  // Crear admin con bcrypt correcto para Admin1234!
-  const HASH_ADMIN = await bcrypt.hash('Admin1234!', 10);
-  await conn.query(
-    'INSERT INTO Usuario (nombre, correo, password_hash, id_rol) VALUES (?,?,?,?)',
-    ['Administrador', 'admin@unimente.edu', HASH_ADMIN, id_rol_adm],
-  );
+  // Crear admins con bcrypt correcto
+  const HASH_ADMIN   = await bcrypt.hash('Admin1234!',  10);
+  const HASH_BRENDA  = await bcrypt.hash('Brenda123!',  10);
+  const HASH_ABRIL   = await bcrypt.hash('Abril123!',   10);
+  const HASH_MAI     = await bcrypt.hash('Mai123!',     10);
+
+  const admins = [
+    ['Administrador', 'admin@unimente.edu',          HASH_ADMIN,  id_rol_adm],
+    ['Brenda Admin',  'brendaAdmin@unimente.com',    HASH_BRENDA, id_rol_adm],
+    ['Abril Admin',   'abrilAdmin@unimente.com',     HASH_ABRIL,  id_rol_adm],
+    ['Mai Admin',     'maiAdmin@unimente.com',        HASH_MAI,    id_rol_adm],
+  ];
+  for (const admin of admins) {
+    await conn.query(
+      'INSERT INTO Usuario (nombre, correo, password_hash, id_rol) VALUES (?,?,?,?)',
+      admin,
+    );
+  }
 
   const HASH = await bcrypt.hash('Password123!', 10);
 

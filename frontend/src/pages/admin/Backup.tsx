@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
 import {
-  Database, Download, RotateCcw, Settings, Clock,
+  Database, Download, RotateCcw, Settings, Clock, ArrowDownToLine,
   FileText, FileJson, FileSpreadsheet, File,
   Layers, GitBranch, GitCommit, Play,
   CheckCircle2, AlertTriangle, ShieldCheck,
@@ -79,6 +79,28 @@ export default function Backup() {
 
   const [successMsg, setSuccessMsg] = useState('');
   const ok = (msg: string) => { setSuccessMsg(msg); setTimeout(() => setSuccessMsg(''), 5000); };
+
+  const handleDescargar = async (nombre_archivo: string) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res   = await fetch(
+        `http://localhost:3000/api/backup-download/${encodeURIComponent(nombre_archivo)}`,
+        { headers: { Authorization: token ? `Bearer ${token}` : '' } },
+      );
+      if (!res.ok) { alert('No se pudo descargar el archivo.'); return; }
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href     = url;
+      a.download = nombre_archivo;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      alert('Error al descargar el archivo. Verifica que el servidor esté activo.');
+    }
+  };
 
   // ── Mutations ─────────────────────────────────────────────────
   const [crearBackup, { loading: creating }] = useMutation(CREAR_BACKUP, {
@@ -240,13 +262,24 @@ export default function Backup() {
                     </div>
                     <div className={styles.backupDate}>{fmtDate(b.created_at)}</div>
                   </div>
-                  <Button
-                    variant="secondary" size="sm"
-                    icon={<RotateCcw size={13} />}
-                    onClick={() => { setRestoreTarget(b); setRestoreMfa(''); }}
-                  >
-                    Restaurar
-                  </Button>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <Button
+                      variant="secondary" size="sm"
+                      icon={<ArrowDownToLine size={13} />}
+                      onClick={() => handleDescargar(b.nombre_archivo)}
+                      title="Descargar backup"
+                    >
+                      Descargar
+                    </Button>
+                    <Button
+                      variant="secondary" size="sm"
+                      icon={<RotateCcw size={13} />}
+                      onClick={() => { setRestoreTarget(b); setRestoreMfa(''); }}
+                      title="Restaurar base de datos"
+                    >
+                      Restaurar
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>

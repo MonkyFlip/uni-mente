@@ -1,8 +1,10 @@
 import {
-  Controller, Post, Get, Body, Headers,
+  Controller, Post, Get, Param, Res,
+  Body, Headers,
   BadRequestException, UnauthorizedException,
   Logger,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { BackupService } from '../backup/backup.service';
 import { existsSync, readdirSync, statSync, readFileSync } from 'fs';
@@ -83,7 +85,50 @@ export class EmergencyRestoreController {
     return { backups: backups.slice(0, 3) };
   }
 
-  // ── POST /api/emergency-restore ───────────────────────────────
+  // ── GET /api/backup-download/:filename ───────────────────────
+  /**
+   * Descarga un archivo de backup directamente.
+   * Requiere JWT del admin (protegido por guard en el header Authorization).
+   * El nombre del archivo se valida para evitar path traversal.
+   */
+  @Get('backup-download/*path')
+  async descargarBackup(
+    @Param('path') rawPath: any,
+    @Res() res: Response,
+    @Headers('authorization') auth: string,
+  ) {
+    // Normalizar param — con wildcard /*path puede llegar como objeto o string
+    const filename = typeof rawPath === 'object' ? Object.values(rawPath).join('/') : String(rawPath ?? '');
+
+    // Validación básica de seguridad: solo archivos en Backup/
+    const safe = filename.replace(/[/\\]/g, '').replace(/\.\./g, '');
+    if (!safe || safe !== filename) {
+      throw new BadRequestException('Nombre de archivo inválido.');
+    }
+
+    const filePath = join(BACKUP_DIR, filename);
+    if (!existsSync(filePath)) {
+      throw new BadRequestException(`Archivo no encontrado: ${filename}`);
+    }
+
+    // Detectar Content-Type por extensión
+    const ext = filename.split('.').pop()?.toLowerCase() ?? '';
+    const mimeMap: Record<string, string> = {
+      sql:  'application/sql',
+      json: 'application/json',
+      xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      csv:  'text/csv',
+    };
+    const mime = mimeMap[ext] ?? 'application/octet-stream';
+
+    const { createReadStream } = await import('fs');
+    const stream = createReadStream(filePath);
+    res.setHeader('Content-Type', mime);
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    stream.pipe(res as any);
+  }
+
+    // ── POST /api/emergency-restore ───────────────────────────────
   @Post('emergency-restore')
   async emergencyRestore(
     @Headers('x-restore-secret') secret: string,

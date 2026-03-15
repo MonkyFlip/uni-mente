@@ -7,7 +7,7 @@ import { Repository, DataSource } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import {
   existsSync, mkdirSync, writeFileSync, readFileSync,
-  unlinkSync, statSync,
+  unlinkSync, statSync, readdirSync,
 } from 'fs';
 import { join } from 'path';
 import * as mysql2 from 'mysql2/promise';
@@ -150,7 +150,42 @@ export class BackupService implements OnModuleInit {
   }
 
   async listarBackups(): Promise<BackupLog[]> {
-    return this.logRepo.find({ order: { created_at: 'DESC' } });
+    const enBD = await this.logRepo.find({ order: { created_at: 'DESC' } });
+
+    // Si Backup_Log está vacío pero existen archivos en Backup/,
+    // re-sincronizamos el registro (ocurre después de una restauración de emergencia).
+    if (enBD.length === 0 && existsSync(BACKUP_DIR)) {
+      const archivos = readdirSync(BACKUP_DIR).filter(f =>
+        f.startsWith('backup_') && /\.(sql|json|xlsx|csv)$/.test(f)
+      );
+
+      for (const archivo of archivos) {
+        const fp     = join(BACKUP_DIR, archivo);
+        const kb     = Math.ceil(statSync(fp).size / 1024);
+        const partes = archivo.replace(/\.\w+$/, '').split('_');
+        const tipo   = partes[1] ?? 'COMPLETO';
+        const ext    = archivo.split('.').pop()?.toUpperCase() ?? 'SQL';
+        const formato = ext === 'XLSX' ? 'EXCEL' : ext;
+        const modo   = archivo.includes('AUTO') ? 'AUTOMATICO' : 'MANUAL';
+
+        // Inferir fecha del nombre del archivo (DD-MM-YYYY_HH-MMam/pm)
+        // o usar la fecha de modificación del archivo
+        const mtime = statSync(fp).mtime;
+
+        try {
+          const reg = this.logRepo.create({
+            tipo, formato, nombre_archivo: archivo, tamanio_kb: kb, modo,
+          });
+          // Ajustar created_at al mtime del archivo
+          (reg as any).created_at = mtime;
+          await this.logRepo.save(reg);
+        } catch { /* ignorar si ya existe */ }
+      }
+
+      return this.logRepo.find({ order: { created_at: 'DESC' } });
+    }
+
+    return enBD;
   }
 
   async obtenerConfig(): Promise<BackupConfig | null> {

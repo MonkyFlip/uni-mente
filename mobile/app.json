@@ -8,6 +8,10 @@
     "scheme": "mobile",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "extra": {
+      "API_URL": "https://uni-mente-production.up.railway.app/graphql",
+      "API_REST_URL": "https://uni-mente-production.up.railway.app"
+    },
     "ios": {
       "supportsTablet": true
     },

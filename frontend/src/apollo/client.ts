@@ -1,13 +1,23 @@
-import { ApolloClient, InMemoryCache, createHttpLink, from } from '@apollo/client';
+import {
+  ApolloClient,
+  InMemoryCache,
+  createHttpLink,
+  from,
+} from '@apollo/client';
 import { setContext } from '@apollo/client/link/context';
 import { onError } from '@apollo/client/link/error';
 
 const httpLink = createHttpLink({
-  uri: 'https://uni-mente-production.up.railway.app', // http://localhost:3000/graphql <- local
+  uri: 'https://uni-mente-production.up.railway.app/graphql',
+  credentials: 'include',
+  fetchOptions: {
+    mode: 'cors',
+  },
 });
 
 const authLink = setContext((_, { headers }) => {
   const token = localStorage.getItem('token');
+
   return {
     headers: {
       ...headers,
@@ -26,13 +36,24 @@ const errorLink = onError(({ graphQLErrors, networkError }) => {
       }
     });
   }
-  if (networkError) console.error('Network error:', networkError);
+
+  if (networkError) {
+    console.error('Network error:', networkError);
+  }
 });
 
 export const client = new ApolloClient({
   link: from([errorLink, authLink, httpLink]),
   cache: new InMemoryCache(),
   defaultOptions: {
-    watchQuery: { fetchPolicy: 'cache-and-network' },
+    watchQuery: {
+      fetchPolicy: 'cache-and-network',
+    },
+    query: {
+      fetchPolicy: 'network-only',
+    },
+    mutate: {
+      fetchPolicy: 'no-cache',
+    },
   },
 });

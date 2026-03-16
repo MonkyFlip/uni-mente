@@ -3,7 +3,7 @@ import { setContext } from '@apollo/client/link/context';
 import { onError } from '@apollo/client/link/error';
 
 const httpLink = createHttpLink({
-  uri: 'http://localhost:3000/graphql',
+  uri: 'https://uni-mente-production.up.railway.app', // http://localhost:3000/graphql <- local
 });
 
 const authLink = setContext((_, { headers }) => {

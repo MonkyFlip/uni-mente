@@ -1,34 +1,64 @@
-import { Tabs } from 'expo-router';
-import React from 'react';
+import { Tabs, useRouter } from 'expo-router';
+import { useEffect } from 'react';
+import { LayoutDashboard, Users, Calendar, Clock } from 'lucide-react-native';
+import { useAuth } from '../../contexts/AuthContext';
+import { Colors } from '../../constants/colors';
 
-import { HapticTab } from '@/components/haptic-tab';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+export default function TabsLayout() {
+  const { user } = useAuth();
+  const router   = useRouter();
 
-export default function TabLayout() {
-  const colorScheme = useColorScheme();
+  useEffect(() => {
+    if (!user) router.replace('/(auth)/login');
+    else if (user.rol === 'administrador') router.replace('/(admin)/dashboard');
+  }, [user]);
+
+  const isStudent = user?.rol === 'estudiante';
 
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        headerShown: false,
-        tabBarButton: HapticTab,
-      }}>
+        headerShown:             false,
+        tabBarStyle:             { backgroundColor: Colors.navyCard, borderTopColor: Colors.border },
+        tabBarActiveTintColor:   Colors.teal,
+        tabBarInactiveTintColor: Colors.creamDim,
+        tabBarLabelStyle:        { fontSize: 11, fontWeight: '600' },
+      }}
+    >
       <Tabs.Screen
-        name="index"
+        name="dashboard"
         options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          title: 'Inicio',
+          tabBarIcon: ({ color, size }) => <LayoutDashboard size={size} color={color} />,
         }}
       />
       <Tabs.Screen
-        name="explore"
+        name="psicologos"
         options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+          title: 'Psicologos',
+          tabBarIcon: ({ color, size }) => <Users size={size} color={color} />,
         }}
+      />
+      <Tabs.Screen
+        name="mis-citas"
+        options={isStudent ? {
+          title: 'Mis Citas',
+          tabBarIcon: ({ color, size }) => <Calendar size={size} color={color} />,
+        } : { href: null }}
+      />
+      <Tabs.Screen
+        name="agenda"
+        options={!isStudent ? {
+          title: 'Agenda',
+          tabBarIcon: ({ color, size }) => <Calendar size={size} color={color} />,
+        } : { href: null }}
+      />
+      <Tabs.Screen
+        name="horarios"
+        options={!isStudent ? {
+          title: 'Horarios',
+          tabBarIcon: ({ color, size }) => <Clock size={size} color={color} />,
+        } : { href: null }}
       />
     </Tabs>
   );

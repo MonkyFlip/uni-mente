@@ -135,6 +135,16 @@ winget install Microsoft.OpenJDK.17
 ```
 Cierra y vuelve a abrir PowerShell.
 
+### Scripts disponibles
+
+| Comando | Descripcion |
+|---|---|
+| `npm run setup:android` | Detecta el SDK y escribe `android/local.properties` |
+| `npm run prebuild:android` | Ejecuta `expo prebuild` sin limpiar (rapido) |
+| `npm run prebuild:clean` | Ejecuta `expo prebuild --clean` + escribe `local.properties` |
+| `npm run build:android` | Escribe `local.properties` + compila el APK |
+| `npm run build:full` | Prebuild limpio + `local.properties` + compila |
+
 ### Paso 1 — URLs de produccion
 
 Edita `app.json` con las URLs reales:
@@ -183,22 +193,41 @@ applicationVariants.all { variant ->
 }
 ```
 
-### Paso 5 — Configurar ruta del SDK
+### Paso 5 — Compilar (automatizado)
+
+El proyecto incluye el script `scripts/setup-android.js` que detecta la ruta del SDK automaticamente y escribe `local.properties` antes de compilar. Funciona en Windows, macOS y Linux sin configuracion manual.
+
+**Primera vez o cuando se agregaron nuevos paquetes nativos:**
 
 ```powershell
-cd android
-Set-Content -Path local.properties -Value "sdk.dir=C\:\\Users\\TU_USUARIO\\AppData\\Local\\Android\\Sdk"
+npm run prebuild:clean
+npm run build:android
 ```
 
-Reemplaza `TU_USUARIO` con tu usuario de Windows. Verifica que la ruta exista antes de usarla.
-
-### Paso 6 — Compilar
+**Cuando solo cambiaste codigo (.tsx, .ts, app.json):**
 
 ```powershell
+npm run build:android
+```
+
+**Todo en un solo comando (prebuild limpio + compilar):**
+
+```powershell
+npm run build:full
+```
+
+Si prefieres los comandos paso a paso:
+
+```powershell
+# Solo escribe local.properties
+npm run setup:android
+
+# Compilar desde la carpeta android/
+cd android
 .\gradlew assembleRelease
 ```
 
-La primera compilacion descarga dependencias y tarda entre 10 y 20 minutos. Las siguientes son mas rapidas.
+La primera compilacion descarga dependencias y tarda entre 10 y 20 minutos. Las siguientes son mas rapidas porque Gradle usa cache.
 
 ### Resultado
 

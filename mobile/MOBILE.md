@@ -229,6 +229,18 @@ cd android
 
 La primera compilacion descarga dependencias y tarda entre 10 y 20 minutos. Las siguientes son mas rapidas porque Gradle usa cache.
 
+### Resumen rapido — comandos del dia a dia
+
+| Situacion | Comando |
+|---|---|
+| Cambiaste codigo, iconos o URLs | `npm run build:android` |
+| Instalaste un paquete nuevo | `npm run build:full` |
+
+El APK siempre queda en:
+```
+android\app\build\outputs\apk\release\unimente-release.apk
+```
+
 ### Resultado
 
 El APK queda en:

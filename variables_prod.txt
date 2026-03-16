@@ -1,0 +1,9 @@
+MYSQL_DATABASE= unimente
+MYSQL_PUBLIC_URL= mysql://root:CoZYQoXFBocbQqJblzaeSyjQJddRCOOc@switchyard.proxy.rlwy.net:50544/unimente
+MYSQL_ROOT_PASSWORD= CoZYQoXFBocbQqJblzaeSyjQJddRCOOc
+MYSQL_URL= mysql://root:CoZYQoXFBocbQqJblzaeSyjQJddRCOOc@mysql.railway.internal:3306/unimente
+MYSQLDATABASE= unimente
+MYSQLHOST= mysql.railway.internal
+MYSQLPASSWORD= CoZYQoXFBocbQqJblzaeSyjQJddRCOOc
+MYSQLPORT= 3306
+MYSQLUSER= root

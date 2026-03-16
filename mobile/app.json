@@ -10,7 +10,11 @@
     "newArchEnabled": true,
     "extra": {
       "API_URL": "https://uni-mente-production.up.railway.app/graphql",
-      "API_REST_URL": "https://uni-mente-production.up.railway.app"
+      "API_REST_URL": "https://uni-mente-production.up.railway.app",
+      "router": {},
+      "eas": {
+        "projectId": "2b582870-2859-4361-9026-d2e7c135cc5e"
+      }
     },
     "ios": {
       "supportsTablet": true
@@ -23,7 +27,8 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.anonymous.mobile"
     },
     "web": {
       "output": "static",

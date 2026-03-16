@@ -1,7 +1,8 @@
 import {
   createContext, useContext, useState, useCallback,
-  useEffect, ReactNode,
+  useEffect,
 } from 'react';
+import type { ReactNode } from 'react';
 import { TOUR_STEPS } from './tourSteps';
 import type { TourStep } from './tourSteps';
 

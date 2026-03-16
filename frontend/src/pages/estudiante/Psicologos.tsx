@@ -4,7 +4,7 @@ import { Search, Calendar, Clock, User, Stethoscope, CheckCircle2 } from 'lucide
 import { Layout } from '../../components/Layout';
 import {
   PageHeader, Card, Button, EmptyState, Spinner,
-  Modal, Field, Alert, Badge, Pagination, usePagination,
+  Modal, Field, Alert, Pagination, usePagination,
 } from '../../components/UI';
 import { DatePicker } from '../../components/DatePicker';
 import { GET_PSICOLOGOS, AGENDAR_CITA } from '../../graphql/operations';

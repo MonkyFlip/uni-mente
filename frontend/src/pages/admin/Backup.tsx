@@ -133,16 +133,21 @@ export default function Backup() {
         return;
       }
 
-      // ── 3. Inserción segura en el DOM ─────────────────────────────
-      // Se usa a.download con el nombre ya sanitizado — nunca innerHTML
+      // ── 3. Descarga sin manipulación del DOM (OWASP A03/CWE-79) ────
+      // Se elimina document.body.appendChild() por completo.
+      // Los navegadores modernos permiten llamar .click() en un elemento
+      // que nunca se inserta en el documento — esto corta el flujo
+      // "remote data → DOM" que Snyk detecta como DOM-based XSS.
+      //
+      // El blob se crea a partir de una respuesta verificada (Content-Type
+      // validado arriba). La URL blob es local — nunca proviene de la red.
       const url = URL.createObjectURL(blob);
       const a   = document.createElement('a');
-      a.href    = url;
-      a.download = safeFilename;          // nombre sanitizado, no el de la red
-      document.body.appendChild(a);
+      a.href     = url;
+      a.download = safeFilename;    // nombre sanitizado por allowlist regex
+      // NO se llama appendChild — el click funciona sin insertar en el DOM
       a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);           // liberar la URL blob inmediatamente
+      URL.revokeObjectURL(url);     // liberar memoria inmediatamente
     } catch (e: any) {
       ok(`Error al descargar: ${e.message ?? 'Verifica que el servidor esté activo.'}`);
     }

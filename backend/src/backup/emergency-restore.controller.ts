@@ -88,43 +88,72 @@ export class EmergencyRestoreController {
   // ── GET /api/backup-download/:filename ───────────────────────
   /**
    * Descarga un archivo de backup directamente.
-   * Requiere JWT del admin (protegido por guard en el header Authorization).
-   * El nombre del archivo se valida para evitar path traversal.
+   * Requiere JWT del admin en el header Authorization.
+   *
+   * SECURITY — OWASP A01/CWE-23 Path Traversal:
+   *   Se aplica una lista blanca estricta (allowlist) de nombres de archivo válidos:
+   *   - Solo se aceptan nombres que coincidan con el patrón de backups generados
+   *     por el sistema: backup_TIPO_FECHA.ext
+   *   - Se resuelve la ruta final con path.resolve y se verifica que el archivo
+   *     resultante esté dentro de BACKUP_DIR (confinamiento de directorio)
+   *   - Solo se permiten extensiones conocidas: sql, json, xlsx, csv
+   *   - Se rechaza cualquier intento de traversal (../, %2F, null bytes, etc.)
    */
   @Get('backup-download/*path')
   async descargarBackup(
     @Param('path') rawPath: any,
     @Res() res: Response,
-    @Headers('authorization') auth: string,
+    @Headers('authorization') _auth: string,
   ) {
-    // Normalizar param — con wildcard /*path puede llegar como objeto o string
-    const filename = typeof rawPath === 'object' ? Object.values(rawPath).join('/') : String(rawPath ?? '');
+    // ── 1. Normalizar parámetro ───────────────────────────────────
+    // Con wildcard /*path, NestJS puede entregar objeto o string
+    const raw = typeof rawPath === 'object'
+      ? Object.values(rawPath).join('/')
+      : String(rawPath ?? '');
 
-    // Validación básica de seguridad: solo archivos en Backup/
-    const safe = filename.replace(/[/\\]/g, '').replace(/\.\./g, '');
-    if (!safe || safe !== filename) {
+    // ── 2. Allowlist — solo nombres con el patrón conocido del sistema ──
+    // Formato: backup_TIPO_DD-MM-YYYY_HH-MMam.ext
+    // OWASP: Input Validation — rechazar todo lo que no cumpla el patrón
+    const ALLOWED_PATTERN = /^backup_[A-Z]+_\d{2}-\d{2}-\d{4}_\d{2}-\d{2}(?:am|pm)\.(sql|json|xlsx|csv)$/i;
+    if (!ALLOWED_PATTERN.test(raw)) {
+      this.logger.warn(`Intento de descarga con nombre inválido: "${raw}"`);
       throw new BadRequestException('Nombre de archivo inválido.');
     }
 
-    const filePath = join(BACKUP_DIR, filename);
-    if (!existsSync(filePath)) {
-      throw new BadRequestException(`Archivo no encontrado: ${filename}`);
+    // ── 3. Confinamiento de directorio (directory confinement) ────
+    // Resolver la ruta absoluta y verificar que esté dentro de BACKUP_DIR
+    // Esto bloquea cualquier secuencia ../ que haya sobrevivido la validación anterior
+    const { resolve }         = await import('path');
+    const { createReadStream } = await import('fs');
+
+    const resolvedPath = resolve(BACKUP_DIR, raw);
+    if (!resolvedPath.startsWith(BACKUP_DIR + require('path').sep) &&
+        resolvedPath !== BACKUP_DIR) {
+      this.logger.warn(`Intento de path traversal bloqueado: "${raw}" → "${resolvedPath}"`);
+      throw new BadRequestException('Acceso denegado.');
     }
 
-    // Detectar Content-Type por extensión
-    const ext = filename.split('.').pop()?.toLowerCase() ?? '';
-    const mimeMap: Record<string, string> = {
+    // ── 4. Verificar existencia del archivo ───────────────────────
+    if (!existsSync(resolvedPath)) {
+      throw new BadRequestException(`Archivo no encontrado: ${raw}`);
+    }
+
+    // ── 5. Content-Type por extensión (solo extensiones conocidas) ─
+    const ext = raw.split('.').pop()?.toLowerCase() ?? '';
+    const MIME_MAP: Record<string, string> = {
       sql:  'application/sql',
       json: 'application/json',
       xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       csv:  'text/csv',
     };
-    const mime = mimeMap[ext] ?? 'application/octet-stream';
+    const mime = MIME_MAP[ext] ?? 'application/octet-stream';
 
-    const { createReadStream } = await import('fs');
-    const stream = createReadStream(filePath);
+    // ── 6. Streaming seguro ───────────────────────────────────────
+    // Content-Disposition usa el nombre ya validado (solo caracteres seguros)
+    const stream = createReadStream(resolvedPath);
     res.setHeader('Content-Type', mime);
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${raw}"`);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
     stream.pipe(res as any);
   }
 

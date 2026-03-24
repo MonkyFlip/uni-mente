@@ -3,7 +3,7 @@ import {
   StyleSheet, Modal as RNModal, TextInput,
   ScrollView, Pressable,
 } from 'react-native';
-import type { ReactNode } from 'react';
+import { ReactNode } from 'react';
 import { Colors } from '../constants/colors';
 
 // ── Button ────────────────────────────────────────────────────────

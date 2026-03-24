@@ -1,345 +1,472 @@
-# UniMente — App Móvil
+# UniMente — App Movil
 
-Aplicación móvil del Portal de Bienestar Universitario.  
-Stack: **React Native · Expo · Expo Router · Apollo Client · TypeScript**.
+Aplicacion movil del Portal de Bienestar Universitario.
+Stack: **React Native 0.81 · Expo SDK 54 · Expo Router · Apollo Client · TypeScript**.
 
 ---
 
-## Índice
+## Indice
 
 1. [Requisitos](#1-requisitos)
-2. [Instalación](#2-instalación)
+2. [Instalacion](#2-instalacion)
 3. [Conectar con el backend](#3-conectar-con-el-backend)
-4. [Iniciar la aplicación](#4-iniciar-la-aplicación)
-5. [Estructura del proyecto](#5-estructura-del-proyecto)
-6. [Pantallas y navegación](#6-pantallas-y-navegación)
-7. [Autenticación](#7-autenticación)
-8. [Componentes reutilizables](#8-componentes-reutilizables)
-9. [Módulo MFA](#9-módulo-mfa)
-10. [Módulo de respaldos](#10-módulo-de-respaldos)
-11. [Restauración de emergencia](#11-restauración-de-emergencia)
-12. [Decisiones técnicas](#12-decisiones-técnicas)
+4. [Iniciar en desarrollo](#4-iniciar-en-desarrollo)
+5. [Generar APK](#5-generar-apk)
+6. [Estructura del proyecto](#6-estructura-del-proyecto)
+7. [Pantallas y navegacion](#7-pantallas-y-navegacion)
+8. [Autenticacion](#8-autenticacion)
+9. [Componentes reutilizables](#9-componentes-reutilizables)
+10. [Modulo MFA](#10-modulo-mfa)
+11. [Modulo de respaldos](#11-modulo-de-respaldos)
+12. [Paginacion y tiempo real](#12-paginacion-y-tiempo-real)
+13. [Decisiones tecnicas](#13-decisiones-tecnicas)
 
 ---
 
 ## 1. Requisitos
 
-| Herramienta | Versión mínima |
+| Herramienta | Version requerida |
 |---|---|
-| Node.js | 18 LTS |
-| npm | 9 |
-| Expo CLI | `npm install -g expo-cli` |
-| Expo Go (dispositivo) | App Store / Play Store |
-| Backend UniMente | Corriendo (ver README.md) |
-
-Para compilar para iOS se necesita macOS + Xcode.  
-Para compilar para Android se necesita Android Studio + SDK.
+| Node.js | 18 LTS o superior |
+| npm | 9 o superior |
+| Expo Go (dispositivo) | SDK 54 — App Store / Play Store |
+| Android Studio | Para generar APK |
+| JDK | 17 (requerido por Gradle) |
 
 ---
 
-## 2. Instalación
+## 2. Instalacion
 
 ```bash
-cd uni-mente/mobile
-npm install
+# Crear proyecto limpio
+npx create-expo-app mobile
+cd mobile
+
+# Borrar el contenido generado por defecto
+# Copiar todos los archivos del proyecto UniMente sobre el directorio mobile/
+
+# Instalar dependencias
+npm install --legacy-peer-deps
 ```
 
-Paquetes clave instalados:
+### Dependencias clave
 
-| Paquete | Uso |
-|---|---|
-| `expo-router` | Navegación basada en archivos (como Next.js) |
-| `@apollo/client` | Comunicación GraphQL |
-| `@react-native-async-storage/async-storage` | Persistencia del token JWT |
-| `lucide-react-native` | Iconos (mismo set que la web) |
-| `expo-image` | Renderizar QR del MFA |
-| `expo-clipboard` | Copiar secreto TOTP |
-| `expo-file-system` + `expo-sharing` | Descargar y compartir backups |
-| `react-native-safe-area-context` | Márgenes seguros en notch/island |
+| Paquete | Version | Uso |
+|---|---|---|
+| `expo` | ~54.0.33 | SDK base |
+| `expo-router` | ~6.0.23 | Navegacion por archivos |
+| `@apollo/client` | ^3.12.8 | Comunicacion GraphQL |
+| `@react-native-async-storage/async-storage` | 2.2.0 | Persistencia JWT |
+| `react-native-reanimated` | ~4.1.1 | Animaciones (Nueva Arquitectura) |
+| `react-native-worklets` | ~0.5.1 | Requerido por reanimated 4.x |
+| `lucide-react-native` | ^0.447.0 | Iconos |
+| `react-native-svg` | 15.12.1 | Renderizado SVG para iconos |
+| `expo-image` | ~3.0.11 | QR del MFA |
+| `expo-file-system` | ~19.0.21 | Descarga de backups |
+| `expo-sharing` | ~14.0.8 | Compartir backups descargados |
+| `expo-clipboard` | ~8.0.8 | Copiar secreto TOTP |
+
+### Notas importantes
+
+El proyecto fuerza `ajv@8` para evitar el error `Cannot find module 'ajv/dist/compile/codegen'`:
+
+```json
+"overrides": {
+  "ajv": "^8.17.1"
+}
+```
+
+`reanimated 4.x` no necesita plugin en `babel.config.js`. La configuracion correcta es minima:
+
+```js
+module.exports = function (api) {
+  api.cache(true);
+  return { presets: ['babel-preset-expo'] };
+};
+```
 
 ---
 
 ## 3. Conectar con el backend
 
-Edita `constants/api.ts`:
+`constants/api.ts` funciona en dos modos automaticamente:
 
-```typescript
-// iOS Simulator — usar localhost directamente
-export const API_URL      = 'http://localhost:3000/graphql';
-export const API_REST_URL = 'http://localhost:3000';
+**Desarrollo (Expo Go en WiFi):** detecta la IP de la PC desde el Metro Bundler — todos los integrantes pueden usarlo sin configuracion manual.
 
-// Android Emulator — el emulador usa 10.0.2.2 para referirse al host
-export const API_URL      = 'http://10.0.2.2:3000/graphql';
-export const API_REST_URL = 'http://10.0.2.2:3000';
+**Produccion (APK):** lee las URLs del campo `extra` en `app.json`:
 
-// Dispositivo físico en la misma red WiFi
-export const API_URL      = 'http://192.168.x.x:3000/graphql';
-export const API_REST_URL = 'http://192.168.x.x:3000';
+```json
+"extra": {
+  "API_URL":      "https://tu-backend.com/graphql",
+  "API_REST_URL": "https://tu-backend.com"
+}
 ```
+
+Actualiza estas URLs antes de generar el APK.
 
 ---
 
-## 4. Iniciar la aplicación
+## 4. Iniciar en desarrollo
 
-```bash
-# En el dispositivo con Expo Go (escanea el QR)
+```powershell
 npm start
-
-# Solo Android
-npm run android
-
-# Solo iOS (requiere macOS)
-npm run ios
 ```
 
-Expo Go: https://expo.dev/go
+Escanea el QR con **Expo Go SDK 54**. El telefono y la PC deben estar en la misma red WiFi.
 
 ---
 
-## 5. Estructura del proyecto
+## 5. Generar APK
+
+### Prerrequisitos
+
+**1. Android Studio** — https://developer.android.com/studio
+Abre `Tools -> SDK Manager` y verifica que tengas Android SDK Build-Tools y Platform-Tools.
+
+**2. JDK 17:**
+```powershell
+winget install Microsoft.OpenJDK.17
+```
+
+**3. Variables de entorno** (PowerShell como administrador, una sola vez):
+```powershell
+[System.Environment]::SetEnvironmentVariable("ANDROID_HOME", "$env:LOCALAPPDATA\Android\Sdk", "User")
+[System.Environment]::SetEnvironmentVariable("Path", "$env:Path;$env:LOCALAPPDATA\Android\Sdk\platform-tools", "User")
+```
+Cierra y vuelve a abrir PowerShell.
+
+### Scripts disponibles
+
+| Comando | Descripcion |
+|---|---|
+| `npm run setup:android` | Detecta el SDK y escribe `android/local.properties` |
+| `npm run prebuild:android` | Ejecuta `expo prebuild` sin limpiar (rapido) |
+| `npm run prebuild:clean` | Ejecuta `expo prebuild --clean` + escribe `local.properties` |
+| `npm run build:android` | Escribe `local.properties` + compila el APK |
+| `npm run build:full` | Prebuild limpio + `local.properties` + compila |
+
+### Paso 1 — URLs de produccion
+
+Edita `app.json` con las URLs reales:
+
+```json
+"extra": {
+  "API_URL":      "https://tu-backend-real.com/graphql",
+  "API_REST_URL": "https://tu-backend-real.com"
+}
+```
+
+### Paso 2 — Iconos
+
+El icono de la app es `assets/images/icon.png` (1024x1024 px).
+Copia el mismo icono como adaptive-icon para Android:
+
+```powershell
+Copy-Item assets\images\icon.png assets\images\adaptive-icon.png
+```
+
+Archivos requeridos en `assets/images/`:
+
+| Archivo | Tamano |
+|---|---|
+| `icon.png` | 1024x1024 px |
+| `adaptive-icon.png` | 1024x1024 px |
+| `splash-icon.png` | 512x512 px o mayor |
+| `favicon.png` | 64x64 px |
+
+### Paso 3 — Generar proyecto Android nativo
+
+```powershell
+cd C:\ruta\del\proyecto\mobile
+npx expo prebuild --platform android --clean
+```
+
+### Paso 4 — Renombrar el APK (opcional)
+
+Abre `android\app\build.gradle` y agrega esto dentro de `android { }`, antes de `buildTypes`:
+
+```gradle
+applicationVariants.all { variant ->
+    variant.outputs.all {
+        outputFileName = "unimente-${variant.buildType.name}.apk"
+    }
+}
+```
+
+### Paso 5 — Compilar (automatizado)
+
+El proyecto incluye el script `scripts/setup-android.js` que detecta la ruta del SDK automaticamente y escribe `local.properties` antes de compilar. Funciona en Windows, macOS y Linux sin configuracion manual.
+
+**Primera vez o cuando se agregaron nuevos paquetes nativos:**
+
+```powershell
+npm run prebuild:clean
+npm run build:android
+```
+
+**Cuando solo cambiaste codigo (.tsx, .ts, app.json):**
+
+```powershell
+npm run build:android
+```
+
+**Todo en un solo comando (prebuild limpio + compilar):**
+
+```powershell
+npm run build:full
+```
+
+Si prefieres los comandos paso a paso:
+
+```powershell
+# Solo escribe local.properties
+npm run setup:android
+
+# Compilar desde la carpeta android/
+cd android
+.\gradlew assembleRelease
+```
+
+La primera compilacion descarga dependencias y tarda entre 10 y 20 minutos. Las siguientes son mas rapidas porque Gradle usa cache.
+
+### Resumen rapido — comandos del dia a dia
+
+| Situacion | Comando |
+|---|---|
+| Cambiaste codigo, iconos o URLs | `npm run build:android` |
+| Instalaste un paquete nuevo | `npm run build:full` |
+
+El APK siempre queda en:
+```
+android\app\build\outputs\apk\release\unimente-release.apk
+```
+
+### Resultado
+
+El APK queda en:
+```
+android\app\build\outputs\apk\release\unimente-release.apk
+```
+
+### Instalar en el telefono
+
+1. Copia el APK al telefono (USB, Google Drive, WhatsApp, etc.)
+2. En el telefono: **Ajustes -> Seguridad -> Instalar apps de fuentes desconocidas** (activar)
+3. Abre el APK desde el administrador de archivos y toca **Instalar**
+
+La app aparece en pantalla de inicio con el nombre **UniMente**.
+
+---
+
+## 6. Estructura del proyecto
 
 ```
 mobile/
 ├── app/
 │   ├── _layout.tsx              # Root: ApolloProvider + AuthProvider + SafeAreaProvider
-│   ├── index.tsx                # Redirect según rol y estado de auth
-│   ├── emergency-restore.tsx    # Pantalla pública — restauración sin login
+│   ├── index.tsx                # Redirect segun rol y estado de auth
 │   │
 │   ├── (auth)/
 │   │   ├── _layout.tsx
-│   │   ├── login.tsx            # Login + modal cambio de contraseña con MFA
+│   │   ├── login.tsx            # Login + modal cambio de contrasena con MFA
 │   │   └── registro.tsx         # Registro de estudiante
 │   │
-│   ├── (tabs)/                  # Estudiante y Psicólogo
-│   │   ├── _layout.tsx          # Tab bar inferior
+│   ├── (tabs)/                  # Estudiante y Psicologo
+│   │   ├── _layout.tsx          # Tab bar con tabs por rol (href: null para ocultar)
 │   │   ├── dashboard.tsx        # Stats en tiempo real
-│   │   ├── psicologos.tsx       # Buscar + agendar cita
-│   │   ├── mis-citas.tsx        # Citas con filtros (solo estudiante)
-│   │   ├── agenda.tsx           # Agenda + sesiones (solo psicólogo)
-│   │   └── horarios.tsx         # CRUD horarios (solo psicólogo)
+│   │   ├── psicologos.tsx       # Buscar + calendario personalizado + agendar
+│   │   ├── mis-citas.tsx        # Citas con filtros y paginacion (estudiante)
+│   │   ├── agenda.tsx           # Agenda + sesiones clinicas (psicologo)
+│   │   └── horarios.tsx         # CRUD horarios (psicologo)
 │   │
-│   └── (admin)/                 # Solo administrador
-│       ├── _layout.tsx          # Tab bar inferior
-│       ├── dashboard.tsx        # Stats + acciones rápidas
-│       ├── psicologos.tsx       # CRUD psicólogos
-│       ├── backup.tsx           # Respaldos con MFA
-│       └── mfa.tsx              # Configurar TOTP
+│   └── (admin)/
+│       ├── _layout.tsx          # Tab bar del admin
+│       ├── dashboard.tsx        # Stats + acciones rapidas
+│       ├── psicologos.tsx       # CRUD psicologos
+│       ├── backup.tsx           # Respaldos con MFA + descarga
+│       └── mfa.tsx              # Configurar TOTP con QR
 │
-├── components/
-│   └── UI.tsx                   # Button, Card, Alert, Badge, Modal, Input, etc.
-│
+├── components/UI.tsx            # Todos los componentes compartidos
 ├── constants/
-│   ├── colors.ts                # Tokens de diseño (mismos que la web)
-│   └── api.ts                   # URL del backend
-│
-├── contexts/
-│   └── AuthContext.tsx          # Usuario + AsyncStorage
-│
+│   ├── colors.ts                # Tokens de diseno
+│   └── api.ts                   # Auto-deteccion de URL (dev/prod)
+├── contexts/AuthContext.tsx     # JWT en AsyncStorage
 ├── graphql/
-│   ├── client.ts                # Apollo Client con authLink + errorLink
-│   └── operations.ts            # Todas las queries y mutations
-│
-├── package.json
-└── MOBILE.md
+│   ├── client.ts                # Apollo Client
+│   └── operations.ts            # Queries y mutations
+├── assets/images/               # Iconos de la app
+├── app.json                     # Config Expo SDK 54
+├── babel.config.js              # Minimo — solo babel-preset-expo
+└── package.json                 # Con overrides: ajv@8
 ```
 
 ---
 
-## 6. Pantallas y navegación
+## 7. Pantallas y navegacion
 
-Expo Router usa el sistema de archivos como rutas — igual que Next.js pero para móvil.
-
-### Flujo de navegación
+### Flujo
 
 ```
 app/index.tsx
-├── Sin usuario → /(auth)/login
-├── Rol admin   → /(admin)/dashboard
-└── Otro rol    → /(tabs)/dashboard
+├── Sin sesion    → /(auth)/login
+├── Administrador → /(admin)/dashboard
+└── Otro rol      → /(tabs)/dashboard
 ```
-
-### Grupos de rutas
-
-| Grupo | Pantallas | Acceso |
-|---|---|---|
-| `(auth)` | login, registro | Público |
-| `(tabs)` | dashboard, psicologos, mis-citas, agenda, horarios | Estudiante / Psicólogo |
-| `(admin)` | dashboard, psicologos, backup, mfa | Solo administrador |
-| Raíz | emergency-restore | Público |
 
 ### Tabs por rol
 
-**Estudiante:**
-```
-Inicio | Psicólogos | Mis Citas
-```
+Expo Router no soporta JSX condicional entre `<Tabs.Screen>`. Se usa `href: null` para ocultar screens:
 
-**Psicólogo:**
-```
-Inicio | Psicólogos | Agenda | Horarios
-```
-
-**Administrador:**
-```
-Inicio | Psicólogos | Respaldos | Seguridad
-```
-
----
-
-## 7. Autenticación
-
-El token JWT se persiste en `AsyncStorage` con la clave `auth_user`:
-
-```typescript
-interface AuthUser {
-  token:     string;
-  rol:       'administrador' | 'psicologo' | 'estudiante';
-  nombre:    string;
-  correo:    string;
-  id_perfil?: number;
-}
-```
-
-Apollo Client adjunta el token en cada request:
-
-```typescript
-const authLink = setContext(async (_, { headers }) => {
-  const raw   = await AsyncStorage.getItem('auth_user');
-  const token = raw ? JSON.parse(raw).token : null;
-  return { headers: { ...headers, authorization: token ? `Bearer ${token}` : '' } };
-});
-```
-
-### Cambio de contraseña
-
-Botón en la pantalla de login → modal que solicita:
-
-1. Correo de la cuenta
-2. Contraseña actual
-3. Nueva contraseña (mínimo 8 caracteres)
-4. **Código MFA de 6 dígitos — siempre obligatorio**
-
----
-
-## 8. Componentes reutilizables
-
-Todos en `components/UI.tsx`. Diseñados para React Native con los mismos tokens de color que la versión web.
-
-| Componente | Props principales |
+| Rol | Tabs visibles |
 |---|---|
-| `Button` | `onPress`, `variant`, `loading`, `disabled`, `icon`, `size` |
-| `Card` | `children`, `style` |
-| `Alert` | `message`, `type` (error/success/warning) |
-| `Badge` | `label`, `variant` (teal/gray/yellow/green/red) |
-| `Spinner` | `size` |
-| `EmptyState` | `icon`, `title`, `description` |
-| `Field` | `label`, `error`, `children` |
-| `Input` | Todos los props de `TextInput` + estilos base |
-| `Modal` | `open`, `onClose`, `title`, `children` |
-| `SectionHeader` | `title`, `count` |
-| `PageHeader` | `title`, `subtitle` |
-| `StatCard` | `icon`, `label`, `value` |
+| Estudiante | Inicio, Psicologos, Mis Citas |
+| Psicologo | Inicio, Psicologos, Agenda, Horarios |
+| Administrador | Inicio, Psicologos, Respaldos, Seguridad |
+
+### Calendario personalizado
+
+La pantalla de psicologos incluye un componente `InlineCalendar` que solo habilita los dias que coinciden con el horario seleccionado. El calendario navega por meses y salta al mes de la proxima fecha valida al seleccionar un horario.
+
+### Orden de citas
+
+- **Mis Citas (estudiante):** ascendente — la mas proxima aparece primero
+- **Agenda — Proximas (psicologo):** ascendente — la mas cercana primero
+- **Agenda — Historial (psicologo):** descendente — la mas reciente primero
 
 ---
 
-## 9. Módulo MFA
+## 8. Autenticacion
 
-Pantalla `(admin)/mfa.tsx`. Misma funcionalidad que la web.
+Token JWT persistido en `AsyncStorage` con la clave `auth_user`.
+
+### Cambio de contrasena
+
+Accesible desde el boton en la pantalla de login. Siempre requiere codigo MFA de 6 digitos.
+
+---
+
+## 9. Componentes reutilizables
+
+Todos en `components/UI.tsx`:
+
+| Componente | Descripcion |
+|---|---|
+| `Button` | Variantes: primary / secondary / danger. Props: loading, icon, size, disabled |
+| `Card` | Contenedor con borde y fondo oscuro |
+| `Alert` | Mensajes de error / exito / advertencia |
+| `Badge` | Etiquetas de color: teal / gray / yellow / green / red |
+| `Spinner` | Indicador de carga |
+| `EmptyState` | Estado vacio con icono y descripcion |
+| `Field` | Wrapper de input con label y mensaje de error |
+| `Input` | TextInput estilizado |
+| `Modal` | Modal con overlay y scroll interno |
+| `SectionHeader` | Titulo de seccion con contador opcional |
+| `PageHeader` | Titulo y subtitulo de pantalla |
+| `StatCard` | Tarjeta de estadistica con icono y valor |
+| `Pagination` | Paginacion con ellipsis y conteo |
+| `usePagination` | Hook que devuelve page, setPage, slice, total, totalPages |
+
+---
+
+## 10. Modulo MFA
 
 ### Activar MFA
 
 ```
-1. Toca "Activar MFA"
+1. Tocar "Activar MFA"
 2. Backend genera secreto TOTP + QR (PNG base64)
 3. expo-image renderiza el QR
-4. Usuario escanea con Google/Microsoft Authenticator
-5. Ingresa código de 6 dígitos para confirmar
-6. MFA activo
+4. Escanear con Google/Microsoft Authenticator
+5. Ingresar codigo de 6 digitos para confirmar
 ```
 
-El secreto base32 se puede copiar al portapapeles con `expo-clipboard` para ingreso manual en la app autenticadora.
+El secreto puede copiarse al portapapeles con `expo-clipboard` para ingreso manual.
 
-### Código MFA en backups
-
-El modal de confirmación de backup tiene el campo MFA visible y obligatorio. El botón "Crear respaldo" permanece deshabilitado hasta que haya exactamente 6 dígitos. El error local se limpia al escribir en el campo.
+El codigo MFA es obligatorio para: crear backups, restaurar backups y cambiar contrasena.
 
 ---
 
-## 10. Módulo de respaldos
-
-Pantalla `(admin)/backup.tsx`.
+## 11. Modulo de respaldos
 
 ### Crear backup
 
-1. Seleccionar tipo (COMPLETO / DIFERENCIAL / INCREMENTAL)
-2. Seleccionar formato (SQL / JSON / EXCEL / CSV)
-3. Tocar "Crear respaldo" → modal de confirmación con código MFA
-4. Ingresar 6 dígitos → confirmar
+1. Tipo: COMPLETO / DIFERENCIAL / INCREMENTAL
+2. Formato: SQL / JSON / EXCEL / CSV
+3. Modal de confirmacion con codigo MFA obligatorio
 
 ### Descargar backup
 
-Botón de descarga en cada fila. Usa `expo-file-system` para descargar el archivo con el JWT en el header y `expo-sharing` para abrir el menú de compartir nativo del dispositivo (guardar, enviar por correo, etc.).
-
-```typescript
-const dl = await FileSystem.downloadAsync(url, dest, {
-  headers: { Authorization: `Bearer ${token}` },
-});
-await Sharing.shareAsync(dl.uri);
-```
+`expo-file-system` descarga el archivo con JWT en el header. `expo-sharing` abre el menu nativo para guardar o compartir.
 
 ### Restaurar backup
 
-Modal de confirmación con código MFA de 6 dígitos obligatorio.
-
-### Backup automático
-
-La configuración del backup automático se realiza desde la versión web (`/admin/backup`). La app móvil muestra el estado de la configuración pero no permite modificarla.
+Modal de confirmacion con codigo MFA obligatorio.
 
 ---
 
-## 11. Restauración de emergencia
+## 12. Paginacion y tiempo real
 
-Pantalla pública `app/emergency-restore.tsx`. Accesible desde el botón en la pantalla de login.
+### Paginacion por pantalla
 
-### Protocolo
+| Pantalla | Registros por pagina |
+|---|---|
+| Admin Psicologos | 9 |
+| Estudiante Psicologos | 6 |
+| Mis Citas | 10 |
+| Agenda — Proximas | 8 |
+| Agenda — Historial | 10 |
 
+La paginacion se resetea al buscar o cambiar filtros.
+
+### Refresco en tiempo real
+
+`useFocusEffect` ejecuta `refetch()` cada vez que la pantalla entra en foco:
+
+```typescript
+useFocusEffect(useCallback(() => { refetch(); }, []));
 ```
-1. Tocar "Restauración de emergencia" en el login
-2. Ver la lista de backups disponibles (cargada automáticamente)
-3. Seleccionar el backup a restaurar
-4. Ingresar RESTORE_SECRET del .env del servidor
-5. Confirmar → backend ejecuta init.sql + restaura
-6. Redirección automática a /login tras 2.5 segundos
-```
 
-### Condiciones de activación
-
-Igual que en la web — solo funciona cuando `Usuario` tiene 0 registros y la clave coincide con `RESTORE_SECRET` en el `.env` del servidor.
+Todas las pantallas con datos lo implementan — al volver de otra pestaña los datos siempre estan actualizados.
 
 ---
 
-## 12. Decisiones técnicas
+## 13. Decisiones tecnicas
 
-### Expo Router vs React Navigation
+### SDK 54 con React Compiler desactivado
 
-Expo Router (basado en React Navigation) permite definir rutas por archivos como Next.js. Cada archivo en `app/` es una ruta automáticamente. Los grupos `(auth)`, `(tabs)` y `(admin)` agrupan pantallas sin afectar la URL.
+```json
+"experiments": {
+  "reactCompiler": false
+}
+```
 
-### AsyncStorage en lugar de localStorage
+Evita problemas de compatibilidad con el compilador experimental.
 
-React Native no tiene `localStorage`. Se usa `@react-native-async-storage/async-storage` que es asíncrono — por eso `AuthContext` tiene un estado `loading: true` inicial mientras lee el storage.
+### Nueva Arquitectura
 
-### expo-image para el QR
+Expo Go SDK 54 fuerza la Nueva Arquitectura. El flag `newArchEnabled` en `app.json` no se define (activa por defecto en SDK 54).
 
-`expo-image` es más eficiente que `<Image>` de React Native para renderizar imágenes base64 (el QR del MFA viene como PNG en base64 del backend).
+### reanimated 4.x
 
-### expo-file-system + expo-sharing para descargas
+Disenado para Nueva Arquitectura. Requiere `react-native-worklets` como dependencia separada. No necesita plugin en `babel.config.js`.
 
-Los navegadores pueden hacer `URL.createObjectURL(blob)` pero React Native no tiene DOM. La alternativa nativa es descargar el archivo a `FileSystem.documentDirectory` y luego abrir el menú de compartir con `Sharing.shareAsync()` — permite al usuario guardarlo en Archivos, enviarlo por correo, etc.
+### filter(Boolean) en .map()
 
-### Navegación condicional por rol en tabs
+Previene crashes cuando Apollo devuelve `null` en la cache durante la carga:
 
-El layout de `(tabs)` oculta las tabs que no corresponden al rol actual usando `href: null`. La tab "Mis Citas" solo se muestra a estudiantes; "Agenda" y "Horarios" solo a psicólogos.
+```typescript
+{lista.filter(Boolean).map((item: any) => (...))}
+```
 
-### Iconos: lucide-react-native
+### Optional chaining generalizado
 
-Mismo paquete de iconos que la web (`lucide-react`) pero con el sufijo `-native` para React Native. La API es idéntica — mismos nombres de componentes, mismas props `size`, `color`, `strokeWidth`.
+Todos los accesos a propiedades de objetos de la API usan `?.` para evitar crashes cuando los datos llegan parcialmente.
+
+### Deteccion automatica de IP
+
+```typescript
+const hostUri = Constants.expoConfig?.hostUri ?? '';
+const ip      = hostUri.split(':')[0];
+```
+
+Todos los integrantes del equipo pueden desarrollar en su propia red sin modificar ningun archivo.

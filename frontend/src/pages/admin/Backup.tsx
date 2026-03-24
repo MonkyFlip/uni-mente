@@ -80,25 +80,71 @@ export default function Backup() {
   const [successMsg, setSuccessMsg] = useState('');
   const ok = (msg: string) => { setSuccessMsg(msg); setTimeout(() => setSuccessMsg(''), 5000); };
 
+  /**
+   * SECURITY — OWASP A03/CWE-79 DOM-based XSS:
+   *   El nombre del archivo proviene de un recurso remoto (respuesta de la API).
+   *   Si se usara directamente en document.createElement/innerHTML podría
+   *   ejecutar código malicioso si el servidor fuera comprometido.
+   *
+   *   Mitigación aplicada (Defense in depth):
+   *   1. sanitizeFilename(): elimina cualquier carácter fuera del patrón seguro
+   *      antes de asignarlo a atributos del DOM.
+   *   2. Se usa a.download (atributo seguro) en lugar de innerHTML o innerText.
+   *   3. Se verifica que el nombre cumpla el patrón de backups del sistema.
+   *   4. URL.createObjectURL genera una URL blob local — nunca se inserta
+   *      contenido externo directamente en el DOM.
+   *
+   * OWASP: Output Encoding / Input Validation — A03:2021 Injection
+   */
+  const sanitizeFilename = (name: string): string => {
+    // Allowlist: solo caracteres seguros para nombres de archivo de backup
+    // Patrón: backup_TIPO_DD-MM-YYYY_HH-MMam.ext
+    const ALLOWED = /^backup_[A-Za-z]+_\d{2}-\d{2}-\d{4}_\d{2}-\d{2}(?:am|pm)\.(sql|json|xlsx|csv)$/i;
+    const clean   = name.replace(/[^a-zA-Z0-9_.\-]/g, '');  // eliminar chars peligrosos
+    if (!ALLOWED.test(clean)) {
+      throw new Error(`Nombre de archivo no permitido: ${clean}`);
+    }
+    return clean;
+  };
+
   const handleDescargar = async (nombre_archivo: string) => {
     try {
+      // ── 1. Sanitizar el nombre antes de usarlo en el DOM ─────────
+      const safeFilename = sanitizeFilename(nombre_archivo);
+
       const token = localStorage.getItem('token');
       const res   = await fetch(
-        `http://localhost:3000/api/backup-download/${encodeURIComponent(nombre_archivo)}`,
+        // encodeURIComponent protege la URL de inyección de segmentos
+        `http://localhost:3000/api/backup-download/${encodeURIComponent(safeFilename)}`,
         { headers: { Authorization: token ? `Bearer ${token}` : '' } },
       );
-      if (!res.ok) { alert('No se pudo descargar el archivo.'); return; }
+      if (!res.ok) { ok('No se pudo descargar el archivo.'); return; }
+
       const blob = await res.blob();
-      const url  = URL.createObjectURL(blob);
-      const a    = document.createElement('a');
-      a.href     = url;
-      a.download = nombre_archivo;
+
+      // ── 2. Verificar el Content-Type recibido ─────────────────────
+      // Evita que un blob con tipo text/html se abra como página
+      const contentType = res.headers.get('content-type') ?? '';
+      const ALLOWED_TYPES = ['application/sql', 'application/json',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'text/csv', 'application/octet-stream'];
+      if (!ALLOWED_TYPES.some(t => contentType.startsWith(t))) {
+        ok('Tipo de archivo no permitido.');
+        return;
+      }
+
+      // ── 3. Inserción segura en el DOM ─────────────────────────────
+      // Se usa a.download con el nombre ya sanitizado — nunca innerHTML
+      const url = URL.createObjectURL(blob);
+      const a   = document.createElement('a');
+      a.href    = url;
+      a.download = safeFilename;          // nombre sanitizado, no el de la red
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch {
-      alert('Error al descargar el archivo. Verifica que el servidor esté activo.');
+      URL.revokeObjectURL(url);           // liberar la URL blob inmediatamente
+    } catch (e: any) {
+      ok(`Error al descargar: ${e.message ?? 'Verifica que el servidor esté activo.'}`);
     }
   };
 

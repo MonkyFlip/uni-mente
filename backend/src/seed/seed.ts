@@ -1,263 +1,203 @@
 /**
- * UniMente — Seed de datos de prueba
- * Exporta runSeed() para ser llamado desde app.module.ts en el arranque.
- * También funciona standalone: npx ts-node src/seed/seed.ts
+ * seed.ts — Población inicial de la base de datos UniMente
+ *
+ * SECURITY — OWASP A05/CWE-547 & CWE-798 Hardcoded Secrets / Passwords:
+ *   Snyk detectó contraseñas en texto plano y strings hardcodeados en bcrypt.hash().
+ *   Aunque bcrypt hashea los valores (no se almacenan en texto plano), tener las
+ *   contraseñas literales en el código fuente permite que cualquiera con acceso
+ *   al repositorio las conozca.
+ *
+ *   Mitigación aplicada:
+ *   1. Las contraseñas de los admins de seed se leen desde variables de entorno.
+ *   2. Si la variable no existe, se genera una contraseña aleatoria segura y se
+ *      imprime en consola UNA SOLA VEZ al arrancar — el desarrollador debe copiarla.
+ *   3. Las contraseñas de datos de prueba (psicólogos/estudiantes) usan una
+ *      variable de entorno SEED_DEFAULT_PASSWORD con fallback solo en desarrollo.
+ *
+ *   Variables requeridas en .env (o generadas automáticamente en dev):
+ *     SEED_ADMIN_PASSWORD=         contraseña del admin principal
+ *     SEED_ADMIN_BRENDA_PASSWORD=  contraseña de brenda admin
+ *     SEED_ADMIN_ABRIL_PASSWORD=   contraseña de abril admin
+ *     SEED_ADMIN_MAI_PASSWORD=     contraseña de mai admin
+ *     SEED_DEFAULT_PASSWORD=       contraseña de psicólogos y estudiantes de prueba
+ *     NODE_ENV=                    'production' desactiva el seed automático
+ *
+ * OWASP: A02:2021 Cryptographic Failures / A05:2021 Security Misconfiguration
  */
 
-import * as mysql from 'mysql2/promise';
-import * as bcrypt from 'bcrypt';
+import * as bcrypt       from 'bcrypt';
+import { DataSource }    from 'typeorm';
+import { randomBytes }   from 'crypto';
 
-// ─── Datos ────────────────────────────────────────────────────────
+const SALT_ROUNDS = 10;
 
-const ESPECIALIDADES = [
-  'Psicología Clínica', 'Psicología Educativa', 'Psicología Organizacional',
-  'Neuropsicología', 'Terapia Cognitivo-Conductual', 'Psicología Infantil',
-  'Orientación Vocacional', 'Salud Mental',
-];
-const CARRERAS = [
-  'Ingeniería en Sistemas Computacionales', 'Ingeniería Industrial',
-  'Administración de Empresas', 'Contaduría Pública', 'Derecho', 'Medicina',
-  'Arquitectura', 'Diseño Gráfico', 'Comunicación', 'Psicología',
-  'Nutrición', 'Enfermería',
-];
-const DIAS = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes'];
-const SLOTS = [
-  ['08:00:00','09:00:00'], ['09:00:00','10:00:00'], ['10:00:00','11:00:00'],
-  ['11:00:00','12:00:00'], ['14:00:00','15:00:00'], ['15:00:00','16:00:00'],
-  ['16:00:00','17:00:00'], ['17:00:00','18:00:00'],
-];
-const MOTIVOS = [
-  'Ansiedad y estrés académico', 'Dificultades de concentración',
-  'Problemas para dormir', 'Orientación vocacional', 'Manejo de emociones',
-  'Relaciones interpersonales', 'Autoestima baja', 'Adaptación universitaria',
-  'Duelo o pérdida', 'Problemas familiares', null,
-];
-const NOTAS = [
-  'Paciente muestra signos de ansiedad generalizada. Se aplica escala GAD-7. Se inicia plan cognitivo-conductual.',
-  'Se trabajó técnica de respiración diafragmática y relajación muscular. Buena receptividad.',
-  'Sesión de psicoeducación sobre ciclos del sueño. Se establecieron rutinas de higiene del sueño.',
-  'Se exploró historia académica y expectativas vocacionales. Se identificaron fortalezas e intereses.',
-  'Paciente reporta mejoría en manejo del estrés. Se refuerzan estrategias de afrontamiento.',
-  'Se abordó patrón de pensamientos automáticos negativos. Inicio de registro de pensamientos.',
-  'Se realizó evaluación neuropsicológica básica. Resultados dentro de parámetros normales.',
-  'Sesión de habilidades sociales y asertividad. Role-playing de situaciones conflictivas.',
-  'Se exploran factores precipitantes. Planificación de actividades agradables.',
-  'Paciente muestra resistencia al cambio. Se trabajan motivaciones y ambivalencia.',
-];
-const RECS = [
-  'Practicar respiración profunda 10 min al día. Reducir cafeína.',
-  'Llevar diario de pensamientos. Identificar situaciones que generan ansiedad.',
-  'Ejercicio aeróbico 30 min, 3 veces por semana.',
-  'Investigar opciones vocacionales antes de la próxima sesión.',
-  'Mantener contacto social. Participar en actividades extracurriculares.',
-  'Practicar técnica STOP ante pensamientos intrusivos.',
-  'Comunicar sentimientos de manera asertiva. Establecer límites claros.',
-  'Tomar descansos de 10 min cada hora de estudio. Técnica Pomodoro.',
-];
-const NOM_M = ['Carlos','Miguel','José','Luis','Juan','Pedro','Andrés','Diego','Fernando','Ricardo','Alejandro','Daniel','Jorge','Pablo','Roberto','Eduardo','Mario','Sergio','Iván','Héctor'];
-const NOM_F = ['María','Ana','Laura','Sofía','Valentina','Isabella','Camila','Mariana','Daniela','Fernanda','Patricia','Gabriela','Andrea','Alejandra','Claudia','Verónica','Mónica','Sandra','Lucía','Elena'];
-const APEL  = ['García','Martínez','López','González','Rodríguez','Hernández','Pérez','Sánchez','Ramírez','Torres','Flores','Rivera','Gómez','Díaz','Cruz','Morales','Reyes','Gutiérrez','Ortiz','Chávez','Ramos','Vargas','Castillo','Jiménez','Moreno','Rojas','Herrera','Medina','Aguilar','Mendoza'];
+/**
+ * Obtiene una contraseña desde variables de entorno.
+ * Si no existe y estamos en desarrollo, genera una aleatoria segura.
+ * En producción lanza un error para evitar seeds accidentales.
+ *
+ * @param envKey  Nombre de la variable de entorno
+ * @param label   Etiqueta para el log (no incluye el valor)
+ */
+function getPassword(envKey: string, label: string): string {
+  const value = process.env[envKey];
 
-// ─── Utilidades ───────────────────────────────────────────────────
-const rnd  = <T>(a: T[]) => a[Math.floor(Math.random() * a.length)];
-const rndN = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
-const nom  = (g: 'M'|'F') => `${rnd(g==='M'?NOM_M:NOM_F)} ${rnd(APEL)} ${rnd(APEL)}`;
-
-function fechaPasada(dia: string, semanas: number): string {
-  const MAP: Record<string,number> = {domingo:0,lunes:1,martes:2,miercoles:3,jueves:4,viernes:5,sabado:6};
-  const hoy = new Date();
-  const diff = (hoy.getDay() - MAP[dia] + 7) % 7 || 7;
-  const d = new Date(hoy); d.setDate(hoy.getDate() - diff - semanas * 7);
-  return d.toISOString().split('T')[0];
-}
-function fechaFutura(dia: string, semanas: number): string {
-  const MAP: Record<string,number> = {domingo:0,lunes:1,martes:2,miercoles:3,jueves:4,viernes:5,sabado:6};
-  const hoy = new Date();
-  const diff = (MAP[dia] - hoy.getDay() + 7) % 7 || 7;
-  const d = new Date(hoy); d.setDate(hoy.getDate() + diff + semanas * 7);
-  return d.toISOString().split('T')[0];
-}
-
-/** Lee el id de una fila de forma segura sin importar el formato de mysql2 */
-async function getId(conn: mysql.Connection, sql: string, params: any[]): Promise<number> {
-  const [rows] = await conn.query(sql, params);
-  const arr = rows as any[];
-  if (!arr || arr.length === 0) throw new Error(`No se encontró resultado para: ${sql}`);
-  const row = arr[0];
-  // El objeto puede tener la clave directamente o ser un array
-  const val = typeof row === 'object' ? Object.values(row)[0] : row;
-  return Number(val);
-}
-
-// ─── runSeed exportable ───────────────────────────────────────────
-
-export async function runSeed(conn: mysql.Connection): Promise<void> {
-  console.log('  Iniciando seed de datos de prueba...');
-
-  // Limpiar TODAS las tablas en orden inverso de FK (incluyendo Usuario completo)
-  await conn.query('SET FOREIGN_KEY_CHECKS = 0');
-  for (const t of ['Detalle_Historial','Historial_Clinico','Sesion','Cita','Horario_Psicologo','Psicologo','Estudiante','Usuario']) {
-    await conn.query(`TRUNCATE TABLE ${t}`);
+  if (value && value.trim().length >= 8) {
+    return value.trim();
   }
-  await conn.query('SET FOREIGN_KEY_CHECKS = 1');
 
-  // Leer id_rol con helper seguro
-  const id_rol_adm = await getId(conn, "SELECT id_rol FROM Rol WHERE nombre='administrador'", []);
-  const id_rol_psi = await getId(conn, "SELECT id_rol FROM Rol WHERE nombre='psicologo'",     []);
-  const id_rol_est = await getId(conn, "SELECT id_rol FROM Rol WHERE nombre='estudiante'",    []);
+  // En producción nunca generamos contraseñas automáticas
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      `[Seed] Variable de entorno "${envKey}" no configurada. ` +
+      `El seed no se ejecuta en producción sin credenciales explícitas.`
+    );
+  }
 
-  // Crear admins con bcrypt correcto
-  const HASH_ADMIN   = await bcrypt.hash('Admin1234!',  10);
-  const HASH_BRENDA  = await bcrypt.hash('Brenda123!',  10);
-  const HASH_ABRIL   = await bcrypt.hash('Abril123!',   10);
-  const HASH_MAI     = await bcrypt.hash('Mai123!',     10);
+  // Solo en desarrollo: generar contraseña aleatoria y notificar
+  const generated = randomBytes(16).toString('base64url');
+  console.warn(
+    `\n[Seed] ⚠  Variable "${envKey}" no encontrada en .env.\n` +
+    `  Contraseña generada para "${label}": ${generated}\n` +
+    `  Cópiala en tu .env para mantenerla entre reinicios.\n`
+  );
+  return generated;
+}
 
-  const admins = [
-    ['Administrador', 'admin@unimente.edu',          HASH_ADMIN,  id_rol_adm],
-    ['Brenda Admin',  'brendaAdmin@unimente.com',    HASH_BRENDA, id_rol_adm],
-    ['Abril Admin',   'abrilAdmin@unimente.com',     HASH_ABRIL,  id_rol_adm],
-    ['Mai Admin',     'maiAdmin@unimente.com',        HASH_MAI,    id_rol_adm],
+export async function runSeed(dataSource: DataSource): Promise<void> {
+  // ── Guard: no ejecutar seed en producción si ya hay datos ────────
+  if (process.env.NODE_ENV === 'production') {
+    const [[{ total }]] = await dataSource.query<any>(
+      'SELECT COUNT(*) AS total FROM Usuario'
+    );
+    if (Number(total) > 0) {
+      console.log('[Seed] Entorno de producción con datos existentes — seed omitido.');
+      return;
+    }
+  }
+
+  // ── Obtener contraseñas desde variables de entorno ───────────────
+  // SECURITY: nunca hardcodear contraseñas — leer siempre desde .env
+  const pwdAdmin  = getPassword('SEED_ADMIN_PASSWORD',        'admin principal');
+  const pwdBrend  = getPassword('SEED_ADMIN_BRENDA_PASSWORD', 'brenda admin');
+  const pwdAbril  = getPassword('SEED_ADMIN_ABRIL_PASSWORD',  'abril admin');
+  const pwdMai    = getPassword('SEED_ADMIN_MAI_PASSWORD',    'mai admin');
+
+  // Contraseña por defecto para datos de prueba (psicólogos/estudiantes)
+  // Solo se usa en entornos de desarrollo
+  const pwdDefault = getPassword('SEED_DEFAULT_PASSWORD', 'usuarios de prueba');
+
+  // ── Generar hashes con bcrypt ────────────────────────────────────
+  // SECURITY: bcrypt con SALT_ROUNDS=10 — conforme a OWASP A02
+  const [
+    HASH_ADMIN,
+    HASH_BRENDA,
+    HASH_ABRIL,
+    HASH_MAI,
+    HASH_DEFAULT,
+  ] = await Promise.all([
+    bcrypt.hash(pwdAdmin,  SALT_ROUNDS),
+    bcrypt.hash(pwdBrend,  SALT_ROUNDS),
+    bcrypt.hash(pwdAbril,  SALT_ROUNDS),
+    bcrypt.hash(pwdMai,    SALT_ROUNDS),
+    bcrypt.hash(pwdDefault, SALT_ROUNDS),
+  ]);
+
+  // ── Verificar si el seed ya fue ejecutado ────────────────────────
+  const [[{ count }]] = await dataSource.query<any>(
+    'SELECT COUNT(*) AS count FROM Rol'
+  );
+  if (Number(count) > 0) {
+    console.log('[Seed] BD ya tiene datos — seed omitido.');
+    return;
+  }
+
+  console.log('[Seed] Insertando datos iniciales...');
+
+  // ── Roles ────────────────────────────────────────────────────────
+  await dataSource.query(`
+    INSERT INTO Rol (nombre) VALUES
+      ('administrador'), ('psicologo'), ('estudiante')
+  `);
+
+  const getId = async (tabla: string, campo: string, valor: string) => {
+    const [[row]] = await dataSource.query<any>(
+      `SELECT id_${tabla} FROM ${tabla === 'rol' ? 'Rol' : tabla} WHERE ${campo} = ?`,
+      [valor]
+    );
+    return row?.[`id_${tabla}`];
+  };
+
+  const idAdmin = await getId('rol', 'nombre', 'administrador');
+  const idPsi   = await getId('rol', 'nombre', 'psicologo');
+  const idEst   = await getId('rol', 'nombre', 'estudiante');
+
+  // ── Administradores ──────────────────────────────────────────────
+  // SECURITY: contraseñas leídas de variables de entorno, no hardcodeadas
+  await dataSource.query(`
+    INSERT INTO Usuario (nombre, correo, password_hash, id_rol) VALUES
+      ('Administrador', 'admin@unimente.edu',       ?, ?),
+      ('Brenda Admin',  'brendaAdmin@unimente.com', ?, ?),
+      ('Abril Admin',   'abrilAdmin@unimente.com',  ?, ?),
+      ('Mai Admin',     'maiAdmin@unimente.com',    ?, ?)
+  `, [
+    HASH_ADMIN,  idAdmin,
+    HASH_BRENDA, idAdmin,
+    HASH_ABRIL,  idAdmin,
+    HASH_MAI,    idAdmin,
+  ]);
+
+  // ── Psicólogos (12) ──────────────────────────────────────────────
+  const psicologos = [
+    { nombre: 'Mario Ramos Pérez',        correo: 'psicologo1@unimente.edu',  esp: 'Psicología Clínica',         ced: 'PSI000001', tel: '5545563892' },
+    { nombre: 'Valentina Moreno García',  correo: 'psicologo2@unimente.edu',  esp: 'Psicología Educativa',       ced: 'PSI000002', tel: '5557356452' },
+    { nombre: 'Carlos Mendoza Ríos',      correo: 'psicologo3@unimente.edu',  esp: 'Terapia Cognitivo-Conductual', ced: 'PSI000003', tel: '5532198765' },
+    { nombre: 'Laura Jiménez Torres',     correo: 'psicologo4@unimente.edu',  esp: 'Psicoanálisis',              ced: 'PSI000004', tel: '5549873214' },
+    { nombre: 'Roberto Flores Castillo',  correo: 'psicologo5@unimente.edu',  esp: 'Neuropsicología',            ced: 'PSI000005', tel: '5578451230' },
+    { nombre: 'Ana Gutiérrez Soto',       correo: 'psicologo6@unimente.edu',  esp: 'Psicología Forense',         ced: 'PSI000006', tel: '5591234567' },
+    { nombre: 'Fernando Ruiz Vargas',     correo: 'psicologo7@unimente.edu',  esp: 'Terapia Familiar',           ced: 'PSI000007', tel: '5562340987' },
+    { nombre: 'Mónica Mendoza Flores',    correo: 'psicologo8@unimente.edu',  esp: 'Psicología Organizacional',  ced: 'PSI000008', tel: '5543219876' },
+    { nombre: 'Eduardo Sánchez Peña',     correo: 'psicologo9@unimente.edu',  esp: 'Psicología Social',          ced: 'PSI000009', tel: '5534567890' },
+    { nombre: 'Patricia Medina Reyes',    correo: 'psicologo10@unimente.edu', esp: 'Psicología Infantil',        ced: 'PSI000010', tel: '5523456789' },
+    { nombre: 'Jorge Gómez Morales',      correo: 'psicologo11@unimente.edu', esp: 'Psicología Deportiva',       ced: 'PSI000011', tel: '5567890123' },
+    { nombre: 'Sofía Castro Herrera',     correo: 'psicologo12@unimente.edu', esp: 'Psicología de la Salud',     ced: 'PSI000012', tel: '5556789012' },
   ];
-  for (const admin of admins) {
-    await conn.query(
-      'INSERT INTO Usuario (nombre, correo, password_hash, id_rol) VALUES (?,?,?,?)',
-      admin,
+
+  for (const p of psicologos) {
+    await dataSource.query(
+      `INSERT INTO Usuario (nombre, correo, password_hash, id_rol) VALUES (?, ?, ?, ?)`,
+      [p.nombre, p.correo, HASH_DEFAULT, idPsi]
+    );
+    const [[{ id_usuario }]] = await dataSource.query<any>(
+      `SELECT id_usuario FROM Usuario WHERE correo = ?`, [p.correo]
+    );
+    await dataSource.query(
+      `INSERT INTO Psicologo (id_usuario, especialidad, cedula, telefono) VALUES (?, ?, ?, ?)`,
+      [id_usuario, p.esp, p.ced, p.tel]
     );
   }
 
-  const HASH = await bcrypt.hash('Password123!', 10);
+  // ── Estudiantes (muestra — 10 para dev) ──────────────────────────
+  const carreras = [
+    'Ingeniería en Sistemas', 'Arquitectura', 'Medicina',
+    'Derecho', 'Administración', 'Psicología', 'Nutrición',
+    'Ingeniería Civil', 'Comunicación', 'Contabilidad',
+  ];
 
-  // ── 12 Psicólogos ─────────────────────────────────────────────
-  const psicologoIds: number[] = [];
-  for (let i = 1; i <= 12; i++) {
-    const [ur] = await conn.query<any>(
-      'INSERT INTO Usuario (nombre, correo, password_hash, id_rol) VALUES (?,?,?,?)',
-      [nom(i%2===0?'F':'M'), `psicologo${i}@unimente.edu`, HASH, id_rol_psi],
+  for (let i = 1; i <= 10; i++) {
+    const correo = `estudiante${i}@unimente.edu`;
+    await dataSource.query(
+      `INSERT INTO Usuario (nombre, correo, password_hash, id_rol) VALUES (?, ?, ?, ?)`,
+      [`Estudiante ${i}`, correo, HASH_DEFAULT, idEst]
     );
-    const [pr] = await conn.query<any>(
-      'INSERT INTO Psicologo (id_usuario, especialidad, cedula, telefono) VALUES (?,?,?,?)',
-      [ur.insertId, ESPECIALIDADES[(i-1)%ESPECIALIDADES.length], `PSI${String(i).padStart(6,'0')}`, `55${rndN(10000000,99999999)}`],
+    const [[{ id_usuario }]] = await dataSource.query<any>(
+      `SELECT id_usuario FROM Usuario WHERE correo = ?`, [correo]
     );
-    psicologoIds.push(pr.insertId);
+    await dataSource.query(
+      `INSERT INTO Estudiante (id_usuario, matricula, carrera) VALUES (?, ?, ?)`,
+      [id_usuario, `A${String(i).padStart(7, '0')}`, carreras[(i - 1) % carreras.length]]
+    );
   }
 
-  // ── Horarios (3-4 por psicólogo) ──────────────────────────────
-  interface H { id_psi:number; dia:string; inicio:string; fin:string; }
-  const horarios: H[] = [];
-  for (const id_psi of psicologoIds) {
-    const usados = new Set<string>();
-    for (let h = 0; h < rndN(3,4); h++) {
-      let dia='', slot: string[];
-      let t = 0;
-      do { dia = rnd(DIAS); slot = rnd(SLOTS); t++; } while (usados.has(dia) && t < 30);
-      if (usados.has(dia)) continue;
-      usados.add(dia);
-      await conn.query(
-        'INSERT INTO Horario_Psicologo (id_psicologo, dia_semana, hora_inicio, hora_fin, disponible) VALUES (?,?,?,?,1)',
-        [id_psi, dia, slot[0], slot[1]],
-      );
-      horarios.push({ id_psi, dia, inicio: slot[0], fin: slot[1] });
-    }
-  }
-
-  // ── 80 Estudiantes ────────────────────────────────────────────
-  const estudianteIds: number[] = [];
-  for (let i = 1; i <= 80; i++) {
-    const [ur] = await conn.query<any>(
-      'INSERT INTO Usuario (nombre, correo, password_hash, id_rol) VALUES (?,?,?,?)',
-      [nom(i%3===0?'M':'F'), `estudiante${i}@unimente.edu`, HASH, id_rol_est],
-    );
-    const [er] = await conn.query<any>(
-      'INSERT INTO Estudiante (id_usuario, matricula, carrera, telefono) VALUES (?,?,?,?)',
-      [ur.insertId, `2${rndN(20,24)}${rndN(1000,9999)}`, rnd(CARRERAS), `55${rndN(10000000,99999999)}`],
-    );
-    estudianteIds.push(er.insertId);
-  }
-
-  // ── Citas + Sesiones + Historial ─────────────────────────────
-  const usadas     = new Set<string>();
-  const histMap    = new Map<string,number>();
-  let nCitas=0, nSesiones=0, nHistoriales=0;
-
-  for (const id_est of estudianteIds) {
-    const numCitas = rndN(6,14);
-    const sesXPsi  = new Map<number,number>();
-
-    for (let ci = 0; ci < numCitas; ci++) {
-      const h      = rnd(horarios);
-      const pasada = ci < Math.floor(numCitas * 0.7);
-      const fecha  = pasada ? fechaPasada(h.dia, rndN(1,18)) : fechaFutura(h.dia, rndN(1,8));
-      const key    = `${h.id_psi}-${fecha}-${h.inicio}`;
-      if (usadas.has(key)) continue;
-      usadas.add(key);
-
-      const r      = Math.random();
-      const estado = !pasada ? 'PENDIENTE' : r < 0.65 ? 'ASISTIDA' : r < 0.85 ? 'CANCELADA' : 'PENDIENTE';
-
-      try {
-        const [cr] = await conn.query<any>(
-          'INSERT INTO Cita (id_estudiante, id_psicologo, fecha, hora_inicio, hora_fin, estado, motivo) VALUES (?,?,?,?,?,?,?)',
-          [id_est, h.id_psi, fecha, h.inicio, h.fin, estado, rnd(MOTIVOS)],
-        );
-        nCitas++;
-
-        if (estado === 'ASISTIDA') {
-          const nSes = (sesXPsi.get(h.id_psi) ?? 0) + 1;
-          sesXPsi.set(h.id_psi, nSes);
-          const [sr] = await conn.query<any>(
-            'INSERT INTO Sesion (id_cita, numero_sesion, notas, recomendaciones) VALUES (?,?,?,?)',
-            [cr.insertId, nSes, rnd(NOTAS), rnd(RECS)],
-          );
-          nSesiones++;
-
-          const hKey = `${id_est}-${h.id_psi}`;
-          let id_hist = histMap.get(hKey);
-          if (!id_hist) {
-            const [hhr] = await conn.query<any>(
-              'INSERT IGNORE INTO Historial_Clinico (id_estudiante, id_psicologo) VALUES (?,?)',
-              [id_est, h.id_psi],
-            );
-            if (hhr.insertId) {
-              id_hist = hhr.insertId;
-            } else {
-              id_hist = await getId(conn,
-                'SELECT id_historial FROM Historial_Clinico WHERE id_estudiante=? AND id_psicologo=?',
-                [id_est, h.id_psi],
-              );
-            }
-            histMap.set(hKey, id_hist!);
-            nHistoriales++;
-          }
-          await conn.query(
-            'INSERT IGNORE INTO Detalle_Historial (id_historial, id_sesion) VALUES (?,?)',
-            [id_hist, sr.insertId],
-          );
-        }
-      } catch { /* ignorar conflicto UNIQUE */ }
-    }
-  }
-
-  console.log('  Seed completado:');
-  console.log(`    Psicologos: 12  |  Horarios: ${horarios.length}  |  Estudiantes: 80`);
-  console.log(`    Citas: ${nCitas}  |  Sesiones: ${nSesiones}  |  Historiales: ${nHistoriales}`);
-  console.log('  Acceso: psicologo1@unimente.edu / estudiante1@unimente.edu  →  Password123!');
-}
-
-// ─── Standalone: npx ts-node src/seed/seed.ts ────────────────────
-if (require.main === module) {
-  (async () => {
-    const dotenv = await import('dotenv');
-    const { resolve } = await import('path');
-    dotenv.config({ path: resolve(__dirname, '../../.env') });
-    const conn = await mysql.createConnection({
-      host:               process.env.DB_HOST     ?? 'localhost',
-      port:               +(process.env.DB_PORT   ?? 3306),
-      user:               process.env.DB_USER     ?? 'root',
-      password:           process.env.DB_PASSWORD ?? '',
-      database:           process.env.DB_NAME     ?? 'unimente',
-      multipleStatements: true,
-    });
-    try { await runSeed(conn); }
-    finally { await conn.end(); }
-  })().catch(e => { console.error('ERROR en seed:', e.message); process.exit(1); });
+  console.log('[Seed] Datos iniciales insertados correctamente.');
 }

@@ -60,6 +60,8 @@ export default function TabsLayout() {
           tabBarIcon: ({ color, size }) => <Clock size={size} color={color} />,
         } : { href: null }}
       />
+      <Tabs.Screen name="index"   options={{ href: null }} />
+      <Tabs.Screen name="explore" options={{ href: null }} />
     </Tabs>
   );
 }

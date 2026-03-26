@@ -1,25 +1,32 @@
 import Constants from 'expo-constants';
 
 /**
- * Detecta automáticamente la IP del servidor.
- *
- * Expo expone la IP de la PC en Constants.expoConfig.hostUri
- * con el formato "192.168.x.x:8081" (Metro Bundler).
- * Extraemos solo la IP y apuntamos al puerto 3000 del backend.
- *
- * Esto funciona para todos los integrantes sin importar la red WiFi.
+ * Production: usa las URLs del app.json → extra → API_URL / API_REST_URL
+ * Desarrollo: detecta la IP de la PC desde el Metro Bundler (Expo Go en WiFi)
  */
-function getServerIP(): string {
-  // hostUri viene como "192.168.x.x:8081" en Expo Go
-  const hostUri = Constants.expoConfig?.hostUri ?? '';
-  const ip = hostUri.split(':')[0];
+const extra = Constants.expoConfig?.extra ?? {};
 
-  // Fallback por si corre en emulador o web
-  if (!ip || ip === 'localhost') return 'localhost';
-  return ip;
+function resolveUrls(): { API_URL: string; API_REST_URL: string } {
+  // Si hay URLs configuradas en app.json (producción / EAS Build)
+  if (extra.API_URL && extra.API_REST_URL) {
+    return {
+      API_URL:      extra.API_URL as string,
+      API_REST_URL: extra.API_REST_URL as string,
+    };
+  }
+
+  // Desarrollo local — extraer IP de hostUri de Metro
+  // hostUri tiene el formato "192.168.x.x:8081"
+  const hostUri = Constants.expoConfig?.hostUri ?? '';
+  const ip      = hostUri.split(':')[0];
+  const base    = ip && ip !== 'localhost' ? `http://${ip}:3000` : 'http://localhost:3000';
+
+  return {
+    API_URL:      `${base}/graphql`,
+    API_REST_URL: base,
+  };
 }
 
-const SERVER_IP = getServerIP();
+const { API_URL, API_REST_URL } = resolveUrls();
 
-export const API_URL      = `http://${SERVER_IP}:3000/graphql`;
-export const API_REST_URL = `http://${SERVER_IP}:3000`;
+export { API_URL, API_REST_URL };

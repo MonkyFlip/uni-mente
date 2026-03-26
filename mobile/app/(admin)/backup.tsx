@@ -89,9 +89,8 @@ export default function Backup() {
       const raw   = await AsyncStorage.getItem('auth_user');
       const token = raw ? JSON.parse(raw).token : '';
       const url   = `${API_REST_URL}/api/backup-download/${encodeURIComponent(nombre_archivo)}`;
-      const dest  = (FileSystem as any).documentDirectory
-        ? `${(FileSystem as any).documentDirectory}${nombre_archivo}`
-        : `${(FileSystem as any).cacheDirectory ?? ''}${nombre_archivo}`;
+      const baseDir: string = (FileSystem as any).documentDirectory ?? (FileSystem as any).cacheDirectory ?? '';
+      const dest = baseDir + nombre_archivo;
       const dl    = await FileSystem.downloadAsync(url, dest, {
         headers: { Authorization: `Bearer ${token}` },
       });

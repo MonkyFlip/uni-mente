@@ -1,5 +1,5 @@
 export enum RolNombre {
   ADMINISTRADOR = 'administrador',
-  PSICOLOGO = 'psicologo',
-  ESTUDIANTE = 'estudiante',
+  PSICOLOGO     = 'psicologo',
+  ESTUDIANTE    = 'estudiante',
 }

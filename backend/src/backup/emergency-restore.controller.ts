@@ -1,254 +1,137 @@
+/**
+ * emergency-restore.controller.ts — MSSQL
+ *
+ * OWASP A01 Broken Access Control + CWE-23 Path Traversal:
+ *  - Solo activo cuando tabla Usuario tiene 0 registros.
+ *  - RESTORE_SECRET verificado con comparación constante (no timing attack).
+ *  - backup_filename validado con allowlist: solo [a-zA-Z0-9_\-\.].
+ *  - path.resolve() + startsWith() para directory confinement.
+ *
+ * OWASP A09 Logging:
+ *  - Intentos de acceso no autorizados quedan en log.
+ *  - Intentos de path traversal quedan en log con IP.
+ */
+
 import {
-  Controller, Post, Get, Param, Res,
-  Body, Headers,
-  BadRequestException, UnauthorizedException,
-  Logger,
+  Controller, Post, Body, Headers, HttpException, HttpStatus, Logger, Req,
 } from '@nestjs/common';
-import type { Response } from 'express';
+import { InjectDataSource } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
-import { BackupService } from '../backup/backup.service';
-import { existsSync, readdirSync, statSync, readFileSync } from 'fs';
-import { join } from 'path';
-import * as mysql2 from 'mysql2/promise';
+import { resolve, join, sep } from 'path';
+import { existsSync, readdirSync, readFileSync } from 'fs';
+import { timingSafeEqual } from 'crypto';
+import { Request } from 'express';
+import { BackupService } from './backup.service';
 
 const BACKUP_DIR = join(process.cwd(), 'Backup');
 
-/**
- * Restauración de emergencia.
- * Funciona incluso cuando la BD o sus tablas NO existen.
- *
- * GET  /api/emergency-backups  — lista backups disponibles (sin JWT)
- * POST /api/emergency-restore  — restaura la BD (requiere X-Restore-Secret)
- *
- * Protocolo completo:
- *   1. Crea la BD y las tablas con init.sql si no existen
- *   2. Verifica que la tabla Usuario tiene 0 registros (o no existe)
- *   3. Valida X-Restore-Secret contra .env
- *   4. Restaura el backup seleccionado
- */
+/** Allowlist estricta para nombres de archivo: letras, números, guiones, underscores, puntos */
+const FILENAME_ALLOWLIST = /^[a-zA-Z0-9_\-\.]+$/;
+
+/** Comparación constante de strings para evitar timing attacks en la clave secreta */
+function safeCompare(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  try {
+    return timingSafeEqual(Buffer.from(a, 'utf8'), Buffer.from(b, 'utf8'));
+  } catch {
+    return false;
+  }
+}
+
 @Controller('api')
 export class EmergencyRestoreController {
   private readonly logger = new Logger(EmergencyRestoreController.name);
 
   constructor(
-    private readonly backupService: BackupService,
+    @InjectDataSource() private readonly dataSource: DataSource,
     private readonly configService: ConfigService,
+    private readonly backupService: BackupService,
   ) {}
 
-  // ── GET /api/emergency-backups ────────────────────────────────
-  @Get('emergency-backups')
-  async listarBackupsEmergencia() {
-    if (!existsSync(BACKUP_DIR)) return { backups: [] };
-
-    const archivos = readdirSync(BACKUP_DIR).filter(f =>
-      f.startsWith('backup_') &&
-      /\.(sql|json|xlsx|csv)$/.test(f)
-    );
-
-    // Intentar leer registros de Backup_Log — puede fallar si la BD no existe
-    let registros: any[] = [];
-    try {
-      const conn = await this.getConn(true); // conectar CON la BD
-      try {
-        const [rows] = await conn.query('SELECT * FROM Backup_Log ORDER BY created_at DESC LIMIT 10');
-        registros = rows as any[];
-      } finally {
-        await conn.end();
-      }
-    } catch { /* BD vacía / no existe — continuar solo con filesystem */ }
-
-    const backups = archivos.map(archivo => {
-      const fp     = join(BACKUP_DIR, archivo);
-      const stat   = statSync(fp);
-      const kb     = Math.ceil(stat.size / 1024);
-      const reg    = registros.find(r => r.nombre_archivo === archivo);
-      const partes = archivo.replace(/\.\w+$/, '').split('_');
-      const tipo   = partes[1] ?? 'DESCONOCIDO';
-      const ext    = archivo.split('.').pop()?.toUpperCase() ?? '';
-      const formato = ext === 'XLSX' ? 'EXCEL' : ext;
-
-      return {
-        id_backup:      reg?.id_backup ?? null,
-        nombre_archivo: archivo,
-        tipo,
-        formato,
-        tamanio_kb:     kb,
-        modo:           reg?.modo ?? 'DESCONOCIDO',
-        created_at:     reg?.created_at ?? stat.mtime,
-      };
-    });
-
-    backups.sort((a, b) =>
-      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    );
-
-    return { backups: backups.slice(0, 3) };
-  }
-
-  // ── GET /api/backup-download/:filename ───────────────────────
-  /**
-   * Descarga un archivo de backup directamente.
-   * Requiere JWT del admin en el header Authorization.
-   *
-   * SECURITY — OWASP A01/CWE-23 Path Traversal:
-   *   Se aplica una lista blanca estricta (allowlist) de nombres de archivo válidos:
-   *   - Solo se aceptan nombres que coincidan con el patrón de backups generados
-   *     por el sistema: backup_TIPO_FECHA.ext
-   *   - Se resuelve la ruta final con path.resolve y se verifica que el archivo
-   *     resultante esté dentro de BACKUP_DIR (confinamiento de directorio)
-   *   - Solo se permiten extensiones conocidas: sql, json, xlsx, csv
-   *   - Se rechaza cualquier intento de traversal (../, %2F, null bytes, etc.)
-   */
-  @Get('backup-download/*path')
-  async descargarBackup(
-    @Param('path') rawPath: any,
-    @Res() res: Response,
-    @Headers('authorization') _auth: string,
-  ) {
-    // ── 1. Normalizar parámetro ───────────────────────────────────
-    // Con wildcard /*path, NestJS puede entregar objeto o string
-    const raw = typeof rawPath === 'object'
-      ? Object.values(rawPath).join('/')
-      : String(rawPath ?? '');
-
-    // ── 2. Allowlist — solo nombres con el patrón conocido del sistema ──
-    // Formato: backup_TIPO_DD-MM-YYYY_HH-MMam.ext
-    // OWASP: Input Validation — rechazar todo lo que no cumpla el patrón
-    const ALLOWED_PATTERN = /^backup_[A-Z]+_\d{2}-\d{2}-\d{4}_\d{2}-\d{2}(?:am|pm)\.(sql|json|xlsx|csv)$/i;
-    if (!ALLOWED_PATTERN.test(raw)) {
-      this.logger.warn(`Intento de descarga con nombre inválido: "${raw}"`);
-      throw new BadRequestException('Nombre de archivo inválido.');
-    }
-
-    // ── 3. Confinamiento de directorio (directory confinement) ────
-    // Resolver la ruta absoluta y verificar que esté dentro de BACKUP_DIR
-    // Esto bloquea cualquier secuencia ../ que haya sobrevivido la validación anterior
-    const { resolve }         = await import('path');
-    const { createReadStream } = await import('fs');
-
-    const resolvedPath = resolve(BACKUP_DIR, raw);
-    if (!resolvedPath.startsWith(BACKUP_DIR + require('path').sep) &&
-        resolvedPath !== BACKUP_DIR) {
-      this.logger.warn(`Intento de path traversal bloqueado: "${raw}" → "${resolvedPath}"`);
-      throw new BadRequestException('Acceso denegado.');
-    }
-
-    // ── 4. Verificar existencia del archivo ───────────────────────
-    if (!existsSync(resolvedPath)) {
-      throw new BadRequestException(`Archivo no encontrado: ${raw}`);
-    }
-
-    // ── 5. Content-Type por extensión (solo extensiones conocidas) ─
-    const ext = raw.split('.').pop()?.toLowerCase() ?? '';
-    const MIME_MAP: Record<string, string> = {
-      sql:  'application/sql',
-      json: 'application/json',
-      xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      csv:  'text/csv',
-    };
-    const mime = MIME_MAP[ext] ?? 'application/octet-stream';
-
-    // ── 6. Streaming seguro ───────────────────────────────────────
-    // Content-Disposition usa el nombre ya validado (solo caracteres seguros)
-    const stream = createReadStream(resolvedPath);
-    res.setHeader('Content-Type', mime);
-    res.setHeader('Content-Disposition', `attachment; filename="${raw}"`);
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    stream.pipe(res as any);
-  }
-
-    // ── POST /api/emergency-restore ───────────────────────────────
   @Post('emergency-restore')
   async emergencyRestore(
     @Headers('x-restore-secret') secret: string,
-    @Body('id_backup')        id_backup:        number,
-    @Body('backup_filename')  backup_filename:  string,
+    @Body() body: { id_backup?: number; backup_filename?: string },
+    @Req() req: Request,
   ) {
-    // ── 1. Validar clave secreta ──────────────────────────────────
-    const restoreSecret = this.configService.get<string>('RESTORE_SECRET', '');
-    if (!restoreSecret || restoreSecret.length < 8) {
-      throw new BadRequestException(
-        'RESTORE_SECRET no está configurado en el .env del servidor (mínimo 8 caracteres).',
+    const clientIp = req.ip ?? req.socket?.remoteAddress ?? 'unknown';
+
+    // 1. Verificar clave con comparación segura (anti-timing attack)
+    const expected = this.configService.get<string>('RESTORE_SECRET', '');
+    if (!secret || !safeCompare(secret, expected)) {
+      this.logger.warn(`[EmergencyRestore] Intento con clave incorrecta desde ${clientIp}`);
+      throw new HttpException('Unauthorized', HttpStatus.UNAUTHORIZED);
+    }
+
+    // 2. Solo activo cuando la BD está vacía (A01: no bypass del flujo normal)
+    const res = await this.dataSource.query<any[]>(
+      'SELECT COUNT(*) AS total FROM dbo.Usuario'
+    );
+    const total = Number(res[0]?.total ?? 0);
+    if (total > 0) {
+      this.logger.warn(`[EmergencyRestore] Intento bloqueado — BD tiene ${total} usuarios, IP: ${clientIp}`);
+      throw new HttpException(
+        { message: 'La base de datos ya tiene datos. Usa el flujo normal con MFA.' },
+        HttpStatus.UNAUTHORIZED,
       );
     }
-    if (!secret || secret !== restoreSecret) {
-      this.logger.warn('Intento de restauración de emergencia con clave incorrecta');
-      throw new UnauthorizedException('Clave de restauración incorrecta.');
-    }
 
-    // ── 2. Validar que se indicó qué restaurar ────────────────────
-    if (!id_backup && !backup_filename) {
-      throw new BadRequestException('Proporciona id_backup o backup_filename.');
-    }
-
-    // ── 3. Crear BD y tablas si no existen (init.sql) ─────────────
-    this.logger.warn('RESTAURACIÓN DE EMERGENCIA — ejecutando init.sql...');
+    // 3. Asegurarse de que las tablas existen (ejecutar init.sql primero)
     try {
-      const connInit = await this.getConn(false); // sin BD
-      try {
-        const sqlPath = join(process.cwd(), 'src', 'database', 'init.sql');
+      const sqlPath = join(process.cwd(), 'src', 'database', 'init.sql');
+      if (existsSync(sqlPath)) {
         const sql     = readFileSync(sqlPath, 'utf8');
-        await connInit.query(sql);
-        this.logger.warn('init.sql ejecutado — BD y tablas creadas/verificadas.');
-      } finally {
-        await connInit.end();
+        const batches = sql.split(/^\s*GO\s*$/im).filter(b => b.trim());
+        for (const batch of batches) await this.dataSource.query(batch).catch(() => {});
       }
     } catch (e) {
-      throw new BadRequestException(`Error al inicializar la BD: ${e.message}`);
+      this.logger.warn(`[EmergencyRestore] init.sql: ${e.message}`);
     }
 
-    // ── 4. Verificar que Usuario está vacía ───────────────────────
-    try {
-      const conn = await this.getConn(true);
-      try {
-        const [[{ total }]] = await conn.query<any>(
-          'SELECT COUNT(*) AS total FROM Usuario',
+    // 4. Restaurar por ID
+    if (body.id_backup != null) {
+      await this.backupService.restaurarEmergencia(Number(body.id_backup));
+      this.logger.warn(`[EmergencyRestore] Restauracion OK — backup #${body.id_backup}, IP: ${clientIp}`);
+      return { mensaje: 'Base de datos restaurada correctamente.' };
+    }
+
+    // 5. Restaurar por nombre de archivo con CWE-23 fix
+    if (body.backup_filename) {
+      const filename = body.backup_filename.trim();
+
+      // CWE-23 Step 1: Allowlist — solo caracteres permitidos
+      if (!FILENAME_ALLOWLIST.test(filename)) {
+        this.logger.warn(`[EmergencyRestore] Nombre de archivo rechazado: "${filename}", IP: ${clientIp}`);
+        throw new HttpException(
+          { message: 'Nombre de archivo invalido.' },
+          HttpStatus.BAD_REQUEST,
         );
-        if (Number(total) > 0) {
-          throw new UnauthorizedException(
-            'La restauración de emergencia solo está disponible cuando la base de datos está vacía. ' +
-            'Usa el flujo normal desde /admin/backup con tu código MFA.',
-          );
-        }
-      } finally {
-        await conn.end();
       }
-    } catch (e) {
-      if (e instanceof UnauthorizedException) throw e;
-      throw new BadRequestException(`Error al verificar el estado de la BD: ${e.message}`);
+
+      // CWE-23 Step 2: Directory confinement — la ruta resuelta debe estar dentro de BACKUP_DIR
+      const resolvedPath   = resolve(BACKUP_DIR, filename);
+      const resolvedBackup = resolve(BACKUP_DIR);
+      if (!resolvedPath.startsWith(resolvedBackup + sep)) {
+        this.logger.warn(`[EmergencyRestore] Intento de path traversal bloqueado: "${filename}", IP: ${clientIp}`);
+        throw new HttpException({ message: 'Acceso denegado.' }, HttpStatus.FORBIDDEN);
+      }
+
+      if (!existsSync(resolvedPath)) {
+        throw new HttpException({ message: `Archivo no encontrado: ${filename}` }, HttpStatus.NOT_FOUND);
+      }
+
+      await this.backupService.restaurarEmergenciaPorArchivo(filename);
+      this.logger.warn(`[EmergencyRestore] Restauracion OK — archivo: ${filename}, IP: ${clientIp}`);
+      return { mensaje: 'Base de datos restaurada correctamente.' };
     }
 
-    // ── 5. Restaurar ──────────────────────────────────────────────
-    this.logger.warn(
-      `RESTAURACIÓN DE EMERGENCIA — backup: ${id_backup ?? backup_filename}`,
-    );
-    try {
-      if (id_backup) {
-        await this.backupService.restaurarEmergencia(Number(id_backup));
-      } else {
-        await this.backupService.restaurarEmergenciaPorArchivo(backup_filename);
-      }
-      this.logger.warn('RESTAURACIÓN DE EMERGENCIA completada.');
-      return {
-        ok: true,
-        mensaje: 'Base de datos restaurada correctamente. Ya puedes iniciar sesión.',
-      };
-    } catch (e) {
-      this.logger.error('Error en restauración de emergencia:', e.message);
-      throw new BadRequestException(`Error al restaurar: ${e.message}`);
+    // 6. Listar archivos disponibles si no se especificó ninguno
+    if (existsSync(BACKUP_DIR)) {
+      const archivos = readdirSync(BACKUP_DIR).filter(f => f.startsWith('backup_')).sort();
+      return { message: 'Proporciona id_backup o backup_filename.', archivos_disponibles: archivos };
     }
-  }
 
-  // ── Helper: conexión MySQL ────────────────────────────────────
-  private async getConn(withDatabase: boolean): Promise<mysql2.Connection> {
-    const cfg: mysql2.ConnectionOptions = {
-      host:               this.configService.get('DB_HOST',     'localhost'),
-      port:               +this.configService.get('DB_PORT',    3306),
-      user:               this.configService.get('DB_USER',     'root'),
-      password:           this.configService.get('DB_PASSWORD', ''),
-      multipleStatements: true,
-    };
-    if (withDatabase) cfg.database = this.configService.get('DB_NAME', 'unimente');
-    return mysql2.createConnection(cfg);
+    throw new HttpException({ message: 'Proporciona id_backup o backup_filename.' }, HttpStatus.BAD_REQUEST);
   }
 }

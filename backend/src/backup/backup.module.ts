@@ -7,15 +7,10 @@ import { BackupService } from './backup.service';
 import { BackupResolver } from './backup.resolver';
 import { EmergencyRestoreController } from './emergency-restore.controller';
 import { MfaModule } from '../mfa/mfa.module';
-
 @Module({
-  imports: [
-    ConfigModule,
-    TypeOrmModule.forFeature([BackupLog, BackupConfig]),
-    MfaModule,
-  ],
+  imports: [ConfigModule, TypeOrmModule.forFeature([BackupLog, BackupConfig]), MfaModule],
   controllers: [EmergencyRestoreController],
-  providers:   [BackupService, BackupResolver],
-  exports:     [BackupService],
+  providers: [BackupService, BackupResolver],
+  exports: [BackupService],
 })
 export class BackupModule {}

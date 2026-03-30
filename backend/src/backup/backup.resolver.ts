@@ -9,61 +9,13 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { RolNombre } from '../common/enums/rol.enum';
-
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(RolNombre.ADMINISTRADOR)
+@UseGuards(JwtAuthGuard, RolesGuard) @Roles(RolNombre.ADMINISTRADOR)
 @Resolver()
 export class BackupResolver {
   constructor(private readonly backupService: BackupService) {}
-
-  // ── Queries ────────────────────────────────────────────────────
-
-  @Query(() => [BackupLog], {
-    name: 'listarBackups',
-    description: 'Lista todos los backups disponibles (máx. 3)',
-  })
-  async listarBackups(): Promise<BackupLog[]> {
-    return this.backupService.listarBackups();
-  }
-
-  @Query(() => BackupConfig, {
-    name: 'configBackupAutomatico',
-    nullable: true,
-    description: 'Obtiene la configuración actual de backup automático',
-  })
-  async configBackupAutomatico(): Promise<BackupConfig | null> {
-    return this.backupService.obtenerConfig();
-  }
-
-  // ── Mutations ──────────────────────────────────────────────────
-
-  @Mutation(() => BackupLog, {
-    description: 'Crea un backup manual. Requiere MFA si la cuenta lo tiene activo.',
-  })
-  async crearBackup(
-    @Args('input') input: CreateBackupInput,
-    @CurrentUser() user: any,
-  ): Promise<BackupLog> {
-    return this.backupService.crearBackup(input, user.id_usuario);
-  }
-
-  @Mutation(() => Boolean, {
-    description: 'Restaura la BD desde un backup. Siempre requiere código MFA.',
-  })
-  async restaurarBackup(
-    @Args('input') input: RestaurarBackupInput,
-    @CurrentUser() user: any,
-  ): Promise<boolean> {
-    return this.backupService.restaurarBackup(input, user.id_usuario);
-  }
-
-  @Mutation(() => BackupConfig, {
-    description: 'Configura el backup automático y ejecuta uno inmediatamente.',
-  })
-  async configurarBackupAutomatico(
-    @Args('input') input: ConfigBackupAutoInput,
-    @CurrentUser() user: any,
-  ): Promise<BackupConfig> {
-    return this.backupService.configurarAutomatico(input, user.id_usuario);
-  }
+  @Query(() => [BackupLog], { name: 'listarBackups' }) listarBackups(): Promise<BackupLog[]> { return this.backupService.listarBackups(); }
+  @Query(() => BackupConfig, { name: 'configBackupAutomatico', nullable: true }) configBackupAutomatico(): Promise<BackupConfig | null> { return this.backupService.obtenerConfig(); }
+  @Mutation(() => BackupLog) crearBackup(@Args('input') input: CreateBackupInput, @CurrentUser() u: any): Promise<BackupLog> { return this.backupService.crearBackup(input, u.id_usuario); }
+  @Mutation(() => Boolean) restaurarBackup(@Args('input') input: RestaurarBackupInput, @CurrentUser() u: any): Promise<boolean> { return this.backupService.restaurarBackup(input, u.id_usuario); }
+  @Mutation(() => BackupConfig) configurarBackupAutomatico(@Args('input') input: ConfigBackupAutoInput, @CurrentUser() u: any): Promise<BackupConfig> { return this.backupService.configurarAutomatico(input, u.id_usuario); }
 }

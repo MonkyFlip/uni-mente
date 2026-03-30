@@ -7,16 +7,10 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { RolNombre } from '../common/enums/rol.enum';
-
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(RolNombre.PSICOLOGO)
+@UseGuards(JwtAuthGuard, RolesGuard) @Roles(RolNombre.PSICOLOGO)
 @Resolver(() => Sesion)
 export class SesionResolver {
-  constructor(private readonly sesionService: SesionService) {}
-
-  /** El psicólogo registra la sesión al finalizar la cita */
+  constructor(private readonly service: SesionService) {}
   @Mutation(() => Sesion)
-  async registrarSesion(@Args('input') input: CreateSesionInput): Promise<Sesion> {
-    return this.sesionService.create(input);
-  }
+  registrarSesion(@Args('input') input: CreateSesionInput): Promise<Sesion> { return this.service.create(input); }
 }

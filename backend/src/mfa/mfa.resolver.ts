@@ -1,80 +1,18 @@
-import { Resolver, Mutation, Args, Query } from '@nestjs/graphql';
+import { Resolver, Mutation, Args, Query, ObjectType, Field } from '@nestjs/graphql';
 import { UseGuards } from '@nestjs/common';
 import { MfaService } from './mfa.service';
 import { SetupMfaPayload, VerificarMfaInput, CambiarPasswordInput } from './dto/mfa.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { ObjectType, Field } from '@nestjs/graphql';
-
-@ObjectType()
-class MfaEstado {
-  @Field()
-  mfa_enabled: boolean;
-}
-
+@ObjectType() class MfaEstado { @Field() mfa_enabled: boolean; }
 @UseGuards(JwtAuthGuard)
 @Resolver()
 export class MfaResolver {
   constructor(private readonly mfaService: MfaService) {}
-
-  /**
-   * Paso 1: El usuario solicita configurar MFA.
-   * Devuelve el QR y el secreto. No activa MFA aún.
-   */
-  @Mutation(() => SetupMfaPayload, { description: 'Genera QR y secreto TOTP para configurar MFA' })
-  async setupMfa(@CurrentUser() user: any): Promise<SetupMfaPayload> {
-    return this.mfaService.setupMfa(user.id_usuario);
-  }
-
-  /**
-   * Paso 2: Verificar primer código con la app para activar MFA.
-   */
-  @Mutation(() => Boolean, { description: 'Activa MFA después de escanear el QR y verificar el primer código' })
-  async habilitarMfa(
-    @CurrentUser() user: any,
-    @Args('input') input: VerificarMfaInput,
-  ): Promise<boolean> {
-    return this.mfaService.habilitarMfa(user.id_usuario, input.codigo);
-  }
-
-  /**
-   * Desactivar MFA (requiere código válido para confirmar).
-   */
-  @Mutation(() => Boolean, { description: 'Desactiva MFA de la cuenta actual' })
-  async deshabilitarMfa(
-    @CurrentUser() user: any,
-    @Args('input') input: VerificarMfaInput,
-  ): Promise<boolean> {
-    return this.mfaService.deshabilitarMfa(user.id_usuario, input.codigo);
-  }
-
-  /**
-   * Verificar un código puntual (para pre-chequeos en el frontend).
-   */
-  @Mutation(() => Boolean, { description: 'Verifica si un código MFA es válido en este momento' })
-  async verificarMfa(
-    @CurrentUser() user: any,
-    @Args('input') input: VerificarMfaInput,
-  ): Promise<boolean> {
-    return this.mfaService.verificarCodigo(user.id_usuario, input.codigo);
-  }
-
-  /**
-   * Cambio de contraseña con verificación de contraseña actual + MFA opcional.
-   */
-  @Mutation(() => Boolean, { description: 'Cambia la contraseña del usuario autenticado' })
-  async cambiarPassword(
-    @CurrentUser() user: any,
-    @Args('input') input: CambiarPasswordInput,
-  ): Promise<boolean> {
-    return this.mfaService.cambiarPassword(user.id_usuario, input);
-  }
-
-  /**
-   * Consultar si MFA está activo en la cuenta actual.
-   */
-  @Query(() => MfaEstado, { description: 'Estado de MFA del usuario autenticado' })
-  async miEstadoMfa(@CurrentUser() user: any): Promise<MfaEstado> {
-    return this.mfaService.obtenerEstadoMfa(user.id_usuario);
-  }
+  @Mutation(() => SetupMfaPayload) setupMfa(@CurrentUser() u: any): Promise<SetupMfaPayload> { return this.mfaService.setupMfa(u.id_usuario); }
+  @Mutation(() => Boolean) habilitarMfa(@CurrentUser() u: any, @Args('input') i: VerificarMfaInput): Promise<boolean> { return this.mfaService.habilitarMfa(u.id_usuario, i.codigo); }
+  @Mutation(() => Boolean) deshabilitarMfa(@CurrentUser() u: any, @Args('input') i: VerificarMfaInput): Promise<boolean> { return this.mfaService.deshabilitarMfa(u.id_usuario, i.codigo); }
+  @Mutation(() => Boolean) verificarMfa(@CurrentUser() u: any, @Args('input') i: VerificarMfaInput): Promise<boolean> { return this.mfaService.verificarCodigo(u.id_usuario, i.codigo); }
+  @Mutation(() => Boolean) cambiarPassword(@CurrentUser() u: any, @Args('input') i: CambiarPasswordInput): Promise<boolean> { return this.mfaService.cambiarPassword(u.id_usuario, i); }
+  @Query(() => MfaEstado) miEstadoMfa(@CurrentUser() u: any): Promise<MfaEstado> { return this.mfaService.obtenerEstadoMfa(u.id_usuario); }
 }

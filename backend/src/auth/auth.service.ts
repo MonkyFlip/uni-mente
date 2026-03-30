@@ -1,13 +1,15 @@
+/**
+ * auth.service.ts
+ * OWASP A07: bcrypt compare, JWT con expiración, no revelar si correo existe.
+ */
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import { LoginInput, AuthPayload } from './dto/login.input';
 import { Usuario } from '../usuario/usuario.entity';
 import { Estudiante } from '../estudiante/estudiante.entity';
 import { Psicologo } from '../psicologo/psicologo.entity';
-import { RolNombre } from '../common/enums/rol.enum';
 
 @Injectable()
 export class AuthService {
@@ -18,36 +20,22 @@ export class AuthService {
     private readonly jwtService: JwtService,
   ) {}
 
-  async login(input: LoginInput): Promise<AuthPayload> {
-    const user = await this.usuarioRepo.findOne({
-      where: { correo: input.correo },
-      relations: ['rol'],
-    });
+  async login(correo: string, password: string) {
+    const usuario = await this.usuarioRepo.findOne({ where: { correo }, relations: ['rol_obj'] });
+    // A07: mismo mensaje para correo inválido y password incorrecto (no enumerar usuarios)
+    if (!usuario || !await bcrypt.compare(password, usuario.password_hash))
+      throw new UnauthorizedException('Credenciales invalidas.');
 
-    if (!user) throw new UnauthorizedException('Credenciales inválidas.');
-
-    const valid = await bcrypt.compare(input.password, user.password_hash);
-    if (!valid) throw new UnauthorizedException('Credenciales inválidas.');
-
-    const token = this.jwtService.sign({ sub: user.id_usuario });
-
-    let id_perfil: number | undefined;
-    const rol = user.rol.nombre as RolNombre;
-
-    if (rol === RolNombre.ESTUDIANTE) {
-      const est = await this.estudianteRepo.findOneBy({ id_usuario: user.id_usuario });
-      id_perfil = est?.id_estudiante;
-    } else if (rol === RolNombre.PSICOLOGO) {
-      const psi = await this.psicologoRepo.findOneBy({ id_usuario: user.id_usuario });
-      id_perfil = psi?.id_psicologo;
+    const rol = usuario.rol_obj?.nombre ?? '';
+    let id_perfil: number | null = null;
+    if (rol === 'estudiante') {
+      const e = await this.estudianteRepo.findOneBy({ id_usuario: usuario.id_usuario });
+      id_perfil = e?.id_estudiante ?? null;
+    } else if (rol === 'psicologo') {
+      const p = await this.psicologoRepo.findOneBy({ id_usuario: usuario.id_usuario });
+      id_perfil = p?.id_psicologo ?? null;
     }
-
-    return {
-      access_token: token,
-      rol,
-      nombre: user.nombre,
-      correo: user.correo,
-      id_perfil,
-    };
+    const payload = { id_usuario: usuario.id_usuario, correo: usuario.correo, rol, id_perfil };
+    return { access_token: this.jwtService.sign(payload), rol, nombre: usuario.nombre, correo: usuario.correo, id_perfil };
   }
 }

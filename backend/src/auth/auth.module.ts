@@ -9,18 +9,13 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { Usuario } from '../usuario/usuario.entity';
 import { Estudiante } from '../estudiante/estudiante.entity';
 import { Psicologo } from '../psicologo/psicologo.entity';
-
 @Module({
   imports: [
-    PassportModule.register({ defaultStrategy: 'jwt' }),
-    JwtModule.registerAsync({
-      imports: [ConfigModule],
-      useFactory: (config: ConfigService) => ({
-        secret: config.get('JWT_SECRET', 'unimente_secret'),
-        signOptions: { expiresIn: '8h' },
-      }),
-      inject: [ConfigService],
-    }),
+    ConfigModule, PassportModule,
+    JwtModule.registerAsync({ imports: [ConfigModule], inject: [ConfigService], useFactory: (cfg: ConfigService) => ({
+      secret: cfg.get('JWT_SECRET', 'change_me'),
+      signOptions: { expiresIn: cfg.get('JWT_EXPIRES', '8h') },
+    }) }),
     TypeOrmModule.forFeature([Usuario, Estudiante, Psicologo]),
   ],
   providers: [AuthService, AuthResolver, JwtStrategy],

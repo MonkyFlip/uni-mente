@@ -1,6 +1,7 @@
 import { ObjectType, Field, Int } from '@nestjs/graphql';
 import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 import { Rol } from '../rol/rol.entity';
+
 @ObjectType()
 @Entity('Usuario')
 export class Usuario {
@@ -10,6 +11,8 @@ export class Usuario {
   @Column({ type: 'nvarchar', length: 255 }) password_hash: string;
   @Column({ type: 'nvarchar', length: 255, nullable: true }) mfa_secret?: string;
   @Column({ type: 'bit', default: 0 }) mfa_enabled: boolean;
+  /** Eliminacion logica: false = cuenta desactivada */
+  @Field() @Column({ type: 'bit', default: 1 }) activo: boolean;
   @Field() @CreateDateColumn({ type: 'datetime2' }) created_at: Date;
   @Field(() => Int) @Column() id_rol: number;
   @Field(() => Rol, { nullable: true }) @ManyToOne(() => Rol) @JoinColumn({ name: 'id_rol' }) rol_obj?: Rol;

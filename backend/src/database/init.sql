@@ -38,13 +38,14 @@ IF OBJECT_ID('dbo.Usuario','U') IS NULL
     created_at    DATETIME2      NOT NULL DEFAULT GETDATE(),
     mfa_secret    NVARCHAR(255)  NULL,
     mfa_enabled   BIT            NOT NULL DEFAULT 0,
-    CONSTRAINT PK_Usuario       PRIMARY KEY (id_usuario),
+    activo        BIT            NOT NULL DEFAULT 1,
+    CONSTRAINT PK_Usuario        PRIMARY KEY (id_usuario),
     CONSTRAINT UQ_Usuario_correo UNIQUE (correo),
-    CONSTRAINT FK_Usuario_Rol   FOREIGN KEY (id_rol) REFERENCES dbo.Rol(id_rol)
+    CONSTRAINT FK_Usuario_Rol    FOREIGN KEY (id_rol) REFERENCES dbo.Rol(id_rol)
   );
 GO
 
--- Migración segura MFA (no destruye datos si la tabla ya existe)
+-- Migraciones seguras (no destruyen datos existentes)
 IF NOT EXISTS (
   SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
   WHERE TABLE_SCHEMA='dbo' AND TABLE_NAME='Usuario' AND COLUMN_NAME='mfa_secret'
@@ -57,6 +58,13 @@ IF NOT EXISTS (
 ) ALTER TABLE dbo.Usuario ADD mfa_enabled BIT NOT NULL DEFAULT 0;
 GO
 
+-- Migración eliminación lógica
+IF NOT EXISTS (
+  SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+  WHERE TABLE_SCHEMA='dbo' AND TABLE_NAME='Usuario' AND COLUMN_NAME='activo'
+) ALTER TABLE dbo.Usuario ADD activo BIT NOT NULL DEFAULT 1;
+GO
+
 -- ─── Estudiante ───────────────────────────────────────────────
 IF OBJECT_ID('dbo.Estudiante','U') IS NULL
   CREATE TABLE dbo.Estudiante (
@@ -65,9 +73,9 @@ IF OBJECT_ID('dbo.Estudiante','U') IS NULL
     matricula     NVARCHAR(20)  NULL,
     carrera       NVARCHAR(100) NULL,
     telefono      NVARCHAR(20)  NULL,
-    CONSTRAINT PK_Estudiante          PRIMARY KEY (id_estudiante),
-    CONSTRAINT UQ_Estudiante_usuario  UNIQUE      (id_usuario),
-    CONSTRAINT FK_Estudiante_Usuario  FOREIGN KEY (id_usuario) REFERENCES dbo.Usuario(id_usuario) ON DELETE CASCADE
+    CONSTRAINT PK_Estudiante         PRIMARY KEY (id_estudiante),
+    CONSTRAINT UQ_Estudiante_usuario UNIQUE      (id_usuario),
+    CONSTRAINT FK_Estudiante_Usuario FOREIGN KEY (id_usuario) REFERENCES dbo.Usuario(id_usuario) ON DELETE CASCADE
   );
 GO
 
@@ -79,21 +87,21 @@ IF OBJECT_ID('dbo.Psicologo','U') IS NULL
     especialidad  NVARCHAR(100) NOT NULL,
     cedula        NVARCHAR(50)  NULL,
     telefono      NVARCHAR(20)  NULL,
-    CONSTRAINT PK_Psicologo          PRIMARY KEY (id_psicologo),
-    CONSTRAINT UQ_Psicologo_usuario  UNIQUE      (id_usuario),
-    CONSTRAINT FK_Psicologo_Usuario  FOREIGN KEY (id_usuario) REFERENCES dbo.Usuario(id_usuario) ON DELETE CASCADE
+    CONSTRAINT PK_Psicologo         PRIMARY KEY (id_psicologo),
+    CONSTRAINT UQ_Psicologo_usuario UNIQUE      (id_usuario),
+    CONSTRAINT FK_Psicologo_Usuario FOREIGN KEY (id_usuario) REFERENCES dbo.Usuario(id_usuario) ON DELETE CASCADE
   );
 GO
 
 -- ─── Horario_Psicologo ────────────────────────────────────────
 IF OBJECT_ID('dbo.Horario_Psicologo','U') IS NULL
   CREATE TABLE dbo.Horario_Psicologo (
-    id_horario   INT           NOT NULL IDENTITY(1,1),
-    id_psicologo INT           NOT NULL,
-    dia_semana   NVARCHAR(15)  NOT NULL,
-    hora_inicio  TIME          NOT NULL,
-    hora_fin     TIME          NOT NULL,
-    disponible   BIT           NOT NULL DEFAULT 1,
+    id_horario   INT          NOT NULL IDENTITY(1,1),
+    id_psicologo INT          NOT NULL,
+    dia_semana   NVARCHAR(15) NOT NULL,
+    hora_inicio  TIME         NOT NULL,
+    hora_fin     TIME         NOT NULL,
+    disponible   BIT          NOT NULL DEFAULT 1,
     CONSTRAINT PK_Horario     PRIMARY KEY (id_horario),
     CONSTRAINT FK_Horario_Psi FOREIGN KEY (id_psicologo) REFERENCES dbo.Psicologo(id_psicologo) ON DELETE CASCADE
   );
@@ -111,10 +119,10 @@ IF OBJECT_ID('dbo.Cita','U') IS NULL
     estado        NVARCHAR(20)  NOT NULL DEFAULT 'PENDIENTE',
     motivo        NVARCHAR(MAX) NULL,
     created_at    DATETIME2     NOT NULL DEFAULT GETDATE(),
-    CONSTRAINT PK_Cita        PRIMARY KEY (id_cita),
-    CONSTRAINT UQ_Cita_slot   UNIQUE      (id_psicologo, fecha, hora_inicio),
-    CONSTRAINT FK_Cita_Est    FOREIGN KEY (id_estudiante) REFERENCES dbo.Estudiante(id_estudiante),
-    CONSTRAINT FK_Cita_Psi    FOREIGN KEY (id_psicologo)  REFERENCES dbo.Psicologo(id_psicologo)
+    CONSTRAINT PK_Cita      PRIMARY KEY (id_cita),
+    CONSTRAINT UQ_Cita_slot UNIQUE      (id_psicologo, fecha, hora_inicio),
+    CONSTRAINT FK_Cita_Est  FOREIGN KEY (id_estudiante) REFERENCES dbo.Estudiante(id_estudiante),
+    CONSTRAINT FK_Cita_Psi  FOREIGN KEY (id_psicologo)  REFERENCES dbo.Psicologo(id_psicologo)
   );
 GO
 
@@ -136,28 +144,28 @@ GO
 -- ─── Historial_Clinico ────────────────────────────────────────
 IF OBJECT_ID('dbo.Historial_Clinico','U') IS NULL
   CREATE TABLE dbo.Historial_Clinico (
-    id_historial   INT      NOT NULL IDENTITY(1,1),
-    id_estudiante  INT      NOT NULL,
-    id_psicologo   INT      NOT NULL,
+    id_historial   INT       NOT NULL IDENTITY(1,1),
+    id_estudiante  INT       NOT NULL,
+    id_psicologo   INT       NOT NULL,
     fecha_apertura DATETIME2 NOT NULL DEFAULT GETDATE(),
-    CONSTRAINT PK_Historial     PRIMARY KEY (id_historial),
-    CONSTRAINT UQ_Historial     UNIQUE      (id_estudiante, id_psicologo),
-    CONSTRAINT FK_Hist_Est      FOREIGN KEY (id_estudiante) REFERENCES dbo.Estudiante(id_estudiante),
-    CONSTRAINT FK_Hist_Psi      FOREIGN KEY (id_psicologo)  REFERENCES dbo.Psicologo(id_psicologo)
+    CONSTRAINT PK_Historial PRIMARY KEY (id_historial),
+    CONSTRAINT UQ_Historial UNIQUE      (id_estudiante, id_psicologo),
+    CONSTRAINT FK_Hist_Est  FOREIGN KEY (id_estudiante) REFERENCES dbo.Estudiante(id_estudiante),
+    CONSTRAINT FK_Hist_Psi  FOREIGN KEY (id_psicologo)  REFERENCES dbo.Psicologo(id_psicologo)
   );
 GO
 
 -- ─── Detalle_Historial ────────────────────────────────────────
 IF OBJECT_ID('dbo.Detalle_Historial','U') IS NULL
   CREATE TABLE dbo.Detalle_Historial (
-    id_detalle     INT      NOT NULL IDENTITY(1,1),
-    id_historial   INT      NOT NULL,
-    id_sesion      INT      NOT NULL,
+    id_detalle     INT       NOT NULL IDENTITY(1,1),
+    id_historial   INT       NOT NULL,
+    id_sesion      INT       NOT NULL,
     fecha_registro DATETIME2 NOT NULL DEFAULT GETDATE(),
-    CONSTRAINT PK_Detalle         PRIMARY KEY (id_detalle),
-    CONSTRAINT UQ_Detalle_sesion  UNIQUE      (id_sesion),
-    CONSTRAINT FK_Det_Hist        FOREIGN KEY (id_historial) REFERENCES dbo.Historial_Clinico(id_historial) ON DELETE CASCADE,
-    CONSTRAINT FK_Det_Sesion      FOREIGN KEY (id_sesion)    REFERENCES dbo.Sesion(id_sesion)
+    CONSTRAINT PK_Detalle        PRIMARY KEY (id_detalle),
+    CONSTRAINT UQ_Detalle_sesion UNIQUE      (id_sesion),
+    CONSTRAINT FK_Det_Hist       FOREIGN KEY (id_historial) REFERENCES dbo.Historial_Clinico(id_historial) ON DELETE CASCADE,
+    CONSTRAINT FK_Det_Sesion     FOREIGN KEY (id_sesion)    REFERENCES dbo.Sesion(id_sesion)
   );
 GO
 

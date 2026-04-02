@@ -1,7 +1,5 @@
 import { gql } from '@apollo/client';
 
-// ── Auth ──────────────────────────────────────────────────────────
-
 export const LOGIN = gql`
   mutation Login($correo: String!, $password: String!) {
     login(input: { correo: $correo, password: $password }) {
@@ -21,12 +19,9 @@ export const REGISTRAR_ESTUDIANTE = gql`
       usuario { nombre correo }
       carrera
       matricula
-      telefono
     }
   }
 `;
-
-// ── Usuarios / Stats ──────────────────────────────────────────────
 
 export const GET_ESTUDIANTES = gql`
   query GetEstudiantes {
@@ -34,8 +29,7 @@ export const GET_ESTUDIANTES = gql`
       id_estudiante
       matricula
       carrera
-      telefono
-      usuario { id_usuario nombre correo }
+      usuario { nombre correo }
     }
   }
 `;
@@ -47,25 +41,11 @@ export const GET_PSICOLOGOS = gql`
       especialidad
       cedula
       telefono
-      usuario { id_usuario nombre correo }
+      usuario { nombre correo }
       horarios { id_horario dia_semana hora_inicio hora_fin disponible }
     }
   }
 `;
-
-export const GET_PSICOLOGOS_SLIM = gql`
-  query GetPsicologosSlim {
-    psicologos { id_psicologo }
-  }
-`;
-
-export const GET_ESTUDIANTES_SLIM = gql`
-  query GetEstudiantesSlim {
-    estudiantes { id_estudiante }
-  }
-`;
-
-// ── Psicólogos CRUD ───────────────────────────────────────────────
 
 export const REGISTRAR_PSICOLOGO = gql`
   mutation RegistrarPsicologo($input: CreatePsicologoInput!) {
@@ -73,8 +53,6 @@ export const REGISTRAR_PSICOLOGO = gql`
       id_psicologo
       usuario { nombre correo }
       especialidad
-      cedula
-      telefono
     }
   }
 `;
@@ -86,12 +64,9 @@ export const ACTUALIZAR_PSICOLOGO = gql`
       especialidad
       cedula
       telefono
-      usuario { nombre correo }
     }
   }
 `;
-
-// ── Horarios ──────────────────────────────────────────────────────
 
 export const CREAR_HORARIO = gql`
   mutation CrearHorario($input: CreateHorarioInput!) {
@@ -110,8 +85,6 @@ export const ELIMINAR_HORARIO = gql`
     eliminarHorario(id: $id)
   }
 `;
-
-// ── Citas ─────────────────────────────────────────────────────────
 
 export const AGENDAR_CITA = gql`
   mutation AgendarCita($input: CreateCitaInput!) {
@@ -151,7 +124,6 @@ export const GET_AGENDA_PSICOLOGO = gql`
       estado
       motivo
       estudiante { id_estudiante matricula carrera usuario { nombre correo } }
-      sesion { id_sesion }
     }
   }
 `;
@@ -160,13 +132,7 @@ export const CAMBIAR_ESTADO_CITA = gql`
   mutation CambiarEstadoCita($id_cita: Int!, $input: UpdateEstadoCitaInput!) {
     cambiarEstadoCita(id_cita: $id_cita, input: $input) {
       id_cita
-      fecha
-      hora_inicio
-      hora_fin
       estado
-      motivo
-      estudiante { id_estudiante matricula carrera usuario { nombre correo } }
-      psicologo  { id_psicologo especialidad usuario { nombre } }
     }
   }
 `;
@@ -204,22 +170,73 @@ export const GET_EXPEDIENTE = gql`
   }
 `;
 
-// ── MFA ───────────────────────────────────────────────────────────
+
+export const GET_PSICOLOGOS_ADMIN = gql`
+  query GetPsicologosAdmin {
+    psicologosAdmin {
+      id_psicologo especialidad cedula telefono
+      usuario { id_usuario nombre correo activo created_at }
+      horarios { id_horario dia_semana hora_inicio hora_fin disponible }
+    }
+  }
+`;
+
+export const GET_ESTUDIANTES_ADMIN = gql`
+  query GetEstudiantesAdmin {
+    estudiantesAdmin {
+      id_estudiante matricula carrera telefono
+      usuario { id_usuario nombre correo activo created_at }
+    }
+  }
+`;
+
+export const TOGGLE_ACTIVO_PSICOLOGO = gql`
+  mutation ToggleActivoPsicologo($id: Int!) {
+    toggleActivoPsicologo(id: $id) {
+      id_psicologo especialidad
+      usuario { nombre correo activo }
+    }
+  }
+`;
+
+export const TOGGLE_ACTIVO_ESTUDIANTE = gql`
+  mutation ToggleActivoEstudiante($id: Int!) {
+    toggleActivoEstudiante(id: $id) {
+      id_estudiante matricula carrera
+      usuario { nombre correo activo }
+    }
+  }
+`;
+
+export const GET_MIS_PACIENTES = gql`
+  query MisPacientes {
+    misPacientes {
+      id_historial fecha_apertura
+      estudiante {
+        id_estudiante matricula carrera telefono
+        usuario { nombre correo activo }
+      }
+      detalles {
+        id_detalle fecha_registro
+        sesion {
+          id_sesion numero_sesion notas recomendaciones fecha_registro
+        }
+      }
+    }
+  }
+`;
+
+// ─── MFA ───────────────────────────────────────────────────
 
 export const GET_MFA_ESTADO = gql`
-  query MiEstadoMfa {
-    miEstadoMfa {
-      mfa_enabled
-    }
+  query GetMfaEstado {
+    miEstadoMfa { mfa_enabled }
   }
 `;
 
 export const SETUP_MFA = gql`
   mutation SetupMfa {
-    setupMfa {
-      qr_code
-      secret
-    }
+    setupMfa { qr_code secret }
   }
 `;
 
@@ -235,43 +252,26 @@ export const DESHABILITAR_MFA = gql`
   }
 `;
 
-export const VERIFICAR_MFA = gql`
-  mutation VerificarMfa($input: VerificarMfaInput!) {
-    verificarMfa(input: $input)
-  }
-`;
-
 export const CAMBIAR_PASSWORD = gql`
   mutation CambiarPassword($input: CambiarPasswordInput!) {
     cambiarPassword(input: $input)
   }
 `;
 
-// ── Backup ────────────────────────────────────────────────────────
+// ─── Backup ────────────────────────────────────────────────────
 
 export const GET_BACKUPS = gql`
-  query ListarBackups {
+  query GetBackups {
     listarBackups {
-      id_backup
-      tipo
-      formato
-      nombre_archivo
-      tamanio_kb
-      modo
-      created_at
+      id_backup tipo formato nombre_archivo tamanio_kb modo created_at
     }
   }
 `;
 
 export const GET_BACKUP_CONFIG = gql`
-  query ConfigBackupAutomatico {
+  query GetBackupConfig {
     configBackupAutomatico {
-      id
-      tipo
-      formato
-      frecuencia_horas
-      activo
-      ultima_ejecucion
+      id tipo formato frecuencia_horas activo ultima_ejecucion
     }
   }
 `;
@@ -279,13 +279,7 @@ export const GET_BACKUP_CONFIG = gql`
 export const CREAR_BACKUP = gql`
   mutation CrearBackup($input: CreateBackupInput!) {
     crearBackup(input: $input) {
-      id_backup
-      tipo
-      formato
-      nombre_archivo
-      tamanio_kb
-      modo
-      created_at
+      id_backup tipo formato nombre_archivo tamanio_kb modo created_at
     }
   }
 `;
@@ -297,14 +291,48 @@ export const RESTAURAR_BACKUP = gql`
 `;
 
 export const CONFIGURAR_BACKUP_AUTO = gql`
-  mutation ConfigurarBackupAutomatico($input: ConfigBackupAutoInput!) {
+  mutation ConfigurarBackupAuto($input: ConfigBackupAutoInput!) {
     configurarBackupAutomatico(input: $input) {
-      id
-      tipo
-      formato
-      frecuencia_horas
-      activo
-      ultima_ejecucion
+      id tipo formato frecuencia_horas activo ultima_ejecucion
+    }
+  }
+`;
+
+// ─── Stats slim ────────────────────────────────────────────────
+
+export const GET_PSICOLOGOS_SLIM = gql`
+  query GetPsicologosSlim { psicologos { id_psicologo } }
+`;
+
+export const GET_ESTUDIANTES_SLIM = gql`
+  query GetEstudiantesSlim { estudiantes { id_estudiante } }
+`;
+// ─── JWT-resolved queries (no id_perfil needed) ───────────────
+export const GET_MI_AGENDA = gql`
+  query MiAgenda {
+    miAgenda {
+      id_cita
+      fecha
+      hora_inicio
+      hora_fin
+      estado
+      motivo
+      estudiante { id_estudiante matricula carrera usuario { nombre correo } }
+      sesion { id_sesion }
+    }
+  }
+`;
+
+export const GET_MIS_CITAS = gql`
+  query MisCitas {
+    misCitas {
+      id_cita
+      fecha
+      hora_inicio
+      hora_fin
+      estado
+      motivo
+      psicologo { id_psicologo especialidad usuario { nombre } }
     }
   }
 `;

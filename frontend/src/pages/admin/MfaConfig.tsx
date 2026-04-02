@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
 import {
-  ShieldCheck, ShieldOff, QrCode, KeyRound,
-  CheckCircle2, Copy, Check,
+  ShieldCheck, ShieldOff, KeyRound,
+  Copy, Check,
 } from 'lucide-react';
 import { Layout } from '../../components/Layout';
 import { PageHeader, Card, Button, Alert, Field, Modal } from '../../components/UI';
@@ -91,7 +91,7 @@ export default function MfaConfig() {
             {mfaEnabled ? (
               <Button
                 variant="secondary"
-                icon={<ShieldOff size={16} />}
+
                 onClick={() => setShowDis(true)}
               >
                 Desactivar MFA
@@ -101,7 +101,7 @@ export default function MfaConfig() {
                 {errSetup && <Alert message={errSetup.message.replace('GraphQL error: ', '')} />}
                 <Button
                   loading={settingUp}
-                  icon={<QrCode size={16} />}
+
                   onClick={() => setupMfa()}
                 >
                   Activar MFA
@@ -201,7 +201,7 @@ export default function MfaConfig() {
           <Button
             loading={enabling}
             disabled={codigo.length !== 6}
-            icon={<CheckCircle2 size={16} />}
+
             style={{ width: '100%', marginTop: 8 }}
             onClick={() => habilitarMfa({ variables: { input: { codigo } } })}
           >
@@ -233,7 +233,7 @@ export default function MfaConfig() {
           <Button variant="secondary" onClick={() => setShowDis(false)}>Cancelar</Button>
           <Button
             variant="danger" loading={disabling} disabled={codDis.length !== 6}
-            icon={<ShieldOff size={14} />}
+
             onClick={() => deshabilitarMfa({ variables: { input: { codigo: codDis } } })}
           >
             Desactivar

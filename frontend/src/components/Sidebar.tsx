@@ -1,55 +1,58 @@
 import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
-  LayoutDashboard, Users, Calendar, Clock, UserPlus,
-  LogOut, Brain, Palette, Check, ChevronRight,
-  Database, ShieldCheck, HelpCircle,
+  Brain, LayoutDashboard, Users, Calendar, Clock,
+  Database, Shield, ClipboardList, GraduationCap,
+  UserCheck, LogOut, ChevronDown, Palette,
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
-import type { ThemeId } from '../auth/ThemeContext';
 import { useTheme, THEMES } from '../auth/ThemeContext';
-import { useTour } from '../tours/TourContext';
 import styles from './Sidebar.module.css';
 
-const NAV = {
+const NAV: Record<string, { to: string; icon: React.ReactNode; label: string }[]> = {
   estudiante: [
-    { to: '/dashboard',  Icon: LayoutDashboard, label: 'Inicio',      tour: 'nav-dashboard'  },
-    { to: '/psicologos', Icon: Users,            label: 'Psicólogos',  tour: 'nav-psicologos' },
-    { to: '/mis-citas',  Icon: Calendar,         label: 'Mis Citas',   tour: 'nav-mis-citas'  },
+    { to: '/dashboard',  icon: <LayoutDashboard size={16} />, label: 'Inicio'       },
+    { to: '/psicologos', icon: <Users size={16} />,           label: 'Psicólogos'   },
+    { to: '/mis-citas',  icon: <Calendar size={16} />,        label: 'Mis Citas'    },
+    { to: '/admin/mfa',  icon: <Shield size={16} />,          label: 'Seguridad MFA' },
   ],
   psicologo: [
-    { to: '/dashboard',  Icon: LayoutDashboard, label: 'Inicio',        tour: 'nav-dashboard' },
-    { to: '/agenda',     Icon: Calendar,         label: 'Agenda',        tour: 'nav-agenda'    },
-    { to: '/horarios',   Icon: Clock,            label: 'Mis Horarios',  tour: 'nav-horarios'  },
+    { to: '/dashboard',     icon: <LayoutDashboard size={16} />, label: 'Inicio'        },
+    { to: '/agenda',        icon: <Calendar size={16} />,        label: 'Agenda'         },
+    { to: '/mis-pacientes', icon: <ClipboardList size={16} />,   label: 'Mis Pacientes'  },
+    { to: '/horarios',      icon: <Clock size={16} />,           label: 'Mis Horarios'   },
+    { to: '/admin/mfa',     icon: <Shield size={16} />,          label: 'Seguridad MFA' },
   ],
   administrador: [
-    { to: '/dashboard',           Icon: LayoutDashboard, label: 'Inicio',       tour: 'nav-dashboard' },
-    { to: '/admin/psicologos',    Icon: Users,            label: 'Psicólogos',   tour: 'nav-psicologos' },
-    { to: '/registrar-psicologo', Icon: UserPlus,         label: 'Nuevo Psicólogo', tour: '' },
-    { to: '/admin/backup',        Icon: Database,         label: 'Respaldos',    tour: 'nav-backup' },
-    { to: '/admin/mfa',           Icon: ShieldCheck,      label: 'Seguridad MFA', tour: 'nav-mfa' },
+    { to: '/dashboard',         icon: <LayoutDashboard size={16} />, label: 'Inicio'        },
+    { to: '/admin/psicologos',  icon: <UserCheck size={16} />,       label: 'Psicólogos'    },
+    { to: '/admin/estudiantes', icon: <GraduationCap size={16} />,   label: 'Estudiantes'   },
+    { to: '/admin/backup',      icon: <Database size={16} />,        label: 'Respaldos'     },
+    { to: '/admin/mfa',         icon: <Shield size={16} />,          label: 'Seguridad MFA' },
   ],
 };
 
 export function Sidebar() {
-  const { user, logout } = useAuth();
+  const { user, logout }    = useAuth();
   const { theme, setTheme } = useTheme();
-  const navigate = useNavigate();
-  const { start } = useTour();
-  const [showPalette, setShowPalette] = useState(false);
+  const navigate             = useNavigate();
+  const [themeOpen, setThemeOpen] = useState(false);
+  const links = NAV[user?.rol ?? 'estudiante'] ?? [];
 
-  const links = NAV[user?.rol ?? 'estudiante'];
+  const handleLogout = () => { logout(); navigate('/login'); };
 
   return (
     <aside className={styles.sidebar}>
-      <div className={styles.brand} data-tour="sidebar-brand">
-        <div className={styles.brandIcon}><Brain size={22} strokeWidth={1.8} /></div>
+      {/* Brand */}
+      <div className={styles.brand}>
+        <div className={styles.brandIconWrap}><Brain size={20} strokeWidth={1.5} /></div>
         <div>
           <div className={styles.brandName}>UniMente</div>
           <div className={styles.brandSub}>Portal de Bienestar</div>
         </div>
       </div>
 
+      {/* User card */}
       <div className={styles.userCard}>
         <div className={styles.avatar}>{user?.nombre?.charAt(0).toUpperCase()}</div>
         <div className={styles.userInfo}>
@@ -58,59 +61,50 @@ export function Sidebar() {
         </div>
       </div>
 
+      {/* Nav links */}
       <nav className={styles.nav}>
         <div className={styles.navLabel}>Menú</div>
-        {links.map(({ to, Icon, label, tour }, i) => (
+        {links.map(link => (
           <NavLink
-            key={to}
-            to={to}
-            style={{ animationDelay: `${i * 60}ms` }}
+            key={link.to}
+            to={link.to}
             className={({ isActive }) => `${styles.navLink} ${isActive ? styles.active : ''}`}
-            {...(tour ? { 'data-tour': tour } : {})}
           >
-            <Icon size={17} strokeWidth={1.8} className={styles.navIcon} />
-            <span>{label}</span>
-            <ChevronRight size={13} className={styles.navArrow} />
+            <span className={styles.navIcon}>{link.icon}</span>
+            {link.label}
           </NavLink>
         ))}
       </nav>
 
-      {/* Tour re-launch button */}
-      <button
-        className={styles.tourBtn}
-        onClick={start}
-        title="Relanzar guía del sistema"
-        data-tour="sidebar-tour"
-      >
-        <HelpCircle size={15} strokeWidth={1.8} />
-        <span>Guía del sistema</span>
-      </button>
-
-      <div className={styles.themeSection} data-tour="sidebar-theme">
-        <button className={styles.themeBtn} onClick={() => setShowPalette(p => !p)}>
-          <Palette size={15} strokeWidth={1.8} />
+      {/* Theme dropdown */}
+      <div className={styles.themeSection}>
+        <button
+          className={styles.themeToggle}
+          onClick={() => setThemeOpen(v => !v)}
+        >
+          <Palette size={14} />
           <span>Paleta: {theme.name}</span>
-          <div className={styles.themePreview} style={{ background: theme.preview }} />
+          <ChevronDown size={14} className={`${styles.themeChevron} ${themeOpen ? styles.themeChevronOpen : ''}`} />
         </button>
-
-        <div className={`${styles.palettePanel} ${showPalette ? styles.palettePanelOpen : ''}`}>
-          {THEMES.map((t) => (
-            <button
-              key={t.id}
-              className={`${styles.paletteOption} ${t.id === theme.id ? styles.paletteActive : ''}`}
-              onClick={() => { setTheme(t.id as ThemeId); setShowPalette(false); }}
-            >
-              <div className={styles.paletteSwatch} style={{ background: t.preview }} />
-              <span>{t.name}</span>
-              {t.id === theme.id && <Check size={12} className={styles.paletteCheck} />}
-            </button>
-          ))}
-        </div>
+        {themeOpen && (
+          <div className={styles.themeDropdown}>
+            {THEMES.map(t => (
+              <button
+                key={t.id}
+                className={`${styles.themeOption} ${t.id === theme.id ? styles.themeOptionActive : ''}`}
+                onClick={() => { setTheme(t.id); setThemeOpen(false); }}
+              >
+                <span className={styles.themePreview} style={{ background: t.preview }} />
+                {t.name}
+                {t.id === theme.id && <span className={styles.themeCheck}>✓</span>}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
-      <button className={styles.logoutBtn} onClick={() => { logout(); navigate('/login'); }}>
-        <LogOut size={16} strokeWidth={1.8} />
-        <span>Cerrar sesión</span>
+      <button className={styles.logoutBtn} onClick={handleLogout}>
+        <LogOut size={15} /> Cerrar sesión
       </button>
     </aside>
   );

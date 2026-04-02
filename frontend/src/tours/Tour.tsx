@@ -5,49 +5,39 @@ import styles from './Tour.module.css';
 
 interface Rect { top: number; left: number; width: number; height: number; }
 
-const PADDING = 8;
-const TW = 320;
-const TH = 200;
+const PADDING = 10;
 
 export function Tour() {
   const { active, current, stepIndex, total, next, skip } = useTour();
-  const [rect,       setRect]       = useState<Rect | null>(null);
+  const [rect, setRect] = useState<Rect | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ top: 0, left: 0 });
-  const [vp,         setVp]         = useState({ w: window.innerWidth, h: window.innerHeight });
 
-  // Track viewport size
-  useEffect(() => {
-    const handler = () => setVp({ w: window.innerWidth, h: window.innerHeight });
-    window.addEventListener('resize', handler);
-    return () => window.removeEventListener('resize', handler);
-  }, []);
-
-  // Measure target element
+  // Find target element and measure it
   useLayoutEffect(() => {
     if (!active || !current) { setRect(null); return; }
 
-    const measure = () => {
-      const el = document.querySelector<HTMLElement>(`[data-tour="${current.target}"]`);
-      if (!el) { setRect(null); return; }
-      const r = el.getBoundingClientRect();
-      setRect({
-        top:    r.top    - PADDING,
-        left:   r.left   - PADDING,
-        width:  r.width  + PADDING * 2,
-        height: r.height + PADDING * 2,
-      });
-      el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-    };
+    const el = document.querySelector<HTMLElement>(`[data-tour="${current.target}"]`);
+    if (!el) { setRect(null); return; }
 
-    measure();
-    // Re-measure after potential scroll settle
-    const t = setTimeout(measure, 350);
-    return () => clearTimeout(t);
+    const r = el.getBoundingClientRect();
+    setRect({
+      top:    r.top    - PADDING,
+      left:   r.left   - PADDING,
+      width:  r.width  + PADDING * 2,
+      height: r.height + PADDING * 2,
+    });
+
+    // Scroll element into view
+    el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }, [active, current, stepIndex]);
 
-  // Position tooltip
+  // Position tooltip near the highlighted element
   useEffect(() => {
     if (!rect || !current) return;
+    const TW = 320;
+    const TH = 180;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
 
     let top = 0, left = 0;
     switch (current.position) {
@@ -70,66 +60,60 @@ export function Tour() {
         break;
     }
 
-    // Fallback: if tooltip would go off screen, reposition to center
-    if (left + TW > vp.w - 12) left = vp.w - TW - 16;
-    if (left < 12)              left = 16;
-    if (top  + TH > vp.h - 12) top  = vp.h - TH - 16;
-    if (top  < 12)              top  = 16;
-
+    // Clamp to viewport
+    top  = Math.max(12, Math.min(top,  vh - TH - 12));
+    left = Math.max(12, Math.min(left, vw - TW - 12));
     setTooltipPos({ top, left });
-  }, [rect, current, vp]);
+  }, [rect, current]);
 
   if (!active || !current) return null;
 
   const isLast = stepIndex === total - 1;
 
-  // Build SVG hole coordinates
-  const rx = rect ? Math.max(0, rect.left)  : 0;
-  const ry = rect ? Math.max(0, rect.top)   : 0;
-  const rw = rect ? rect.width  : 0;
-  const rh = rect ? rect.height : 0;
-
   return (
     <div className={styles.root}>
-      {/* Overlay with cutout */}
-      <svg
-        className={styles.overlay}
-        xmlns="http://www.w3.org/2000/svg"
-        width={vp.w}
-        height={vp.h}
-      >
+      {/* Dark overlay with hole */}
+      <svg className={styles.overlay} xmlns="http://www.w3.org/2000/svg">
         <defs>
-          <mask id="tour-cutout">
-            <rect width={vp.w} height={vp.h} fill="white" />
+          <mask id="tour-mask">
+            <rect width="100%" height="100%" fill="white" />
             {rect && (
-              <rect x={rx} y={ry} width={rw} height={rh} rx="10" fill="black" />
+              <rect
+                x={rect.left}
+                y={rect.top}
+                width={rect.width}
+                height={rect.height}
+                rx="10"
+                fill="black"
+              />
             )}
           </mask>
         </defs>
-
-        {/* Dark backdrop with hole */}
         <rect
-          width={vp.w}
-          height={vp.h}
-          fill="rgba(0,0,0,0.62)"
-          mask="url(#tour-cutout)"
+          width="100%"
+          height="100%"
+          fill="rgba(0,0,0,0.65)"
+          mask="url(#tour-mask)"
         />
-
-        {/* Teal border around highlighted element */}
+        {/* Highlight border around target */}
         {rect && (
           <rect
-            x={rx} y={ry} width={rw} height={rh}
-            rx="10" fill="none"
+            x={rect.left}
+            y={rect.top}
+            width={rect.width}
+            height={rect.height}
+            rx="10"
+            fill="none"
             stroke="var(--teal, #1A7A6E)"
             strokeWidth="2"
           />
         )}
       </svg>
 
-      {/* Tooltip */}
+      {/* Tooltip card */}
       <div
         className={styles.tooltip}
-        style={{ top: tooltipPos.top, left: tooltipPos.left, width: TW }}
+        style={{ top: tooltipPos.top, left: tooltipPos.left }}
       >
         <div className={styles.header}>
           <span className={styles.counter}>{stepIndex + 1} / {total}</span>
@@ -145,9 +129,7 @@ export function Tour() {
           {Array.from({ length: total }).map((_, i) => (
             <div
               key={i}
-              className={`${styles.dot}
-                ${i === stepIndex ? styles.dotActive  : ''}
-                ${i  < stepIndex  ? styles.dotDone    : ''}`}
+              className={`${styles.dot} ${i === stepIndex ? styles.dotActive : i < stepIndex ? styles.dotDone : ''}`}
             />
           ))}
         </div>

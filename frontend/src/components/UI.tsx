@@ -1,37 +1,30 @@
-import { useState } from 'react';
 import type { ReactNode } from 'react';
-import { Loader2, AlertCircle, CheckCircle2, X } from 'lucide-react';
 import styles from './UI.module.css';
 
-// ── Button ──────────────────────────────────────────────────────────────────
+// ─── Button ──────────────────────────────────────────────────────────────────
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
   loading?: boolean;
   size?: 'sm' | 'md' | 'lg';
-  icon?: ReactNode;
 }
-export function Button({ variant = 'primary', loading, size = 'md', children, disabled, className = '', icon, ...props }: ButtonProps) {
+export function Button({ variant = 'primary', loading, size = 'md', children, disabled, className = '', ...props }: ButtonProps) {
   return (
     <button
       className={`${styles.btn} ${styles[`btn_${variant}`]} ${styles[`btn_${size}`]} ${className}`}
       disabled={disabled || loading}
       {...props}
     >
-      {loading
-        ? <Loader2 size={16} className={styles.spinIcon} />
-        : icon ? <span className={styles.btnIcon}>{icon}</span> : null
-      }
-      {children}
+      {loading ? <span className={styles.spinner} /> : children}
     </button>
   );
 }
 
-// ── Card ─────────────────────────────────────────────────────────────────────
-export function Card({ children, className = '', hoverable }: { children: ReactNode; className?: string; hoverable?: boolean }) {
-  return <div className={`${styles.card} ${hoverable ? styles.cardHoverable : ''} ${className}`}>{children}</div>;
+// ─── Card ────────────────────────────────────────────────────────────────────
+export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
+  return <div className={`${styles.card} ${className}`}>{children}</div>;
 }
 
-// ── Page Header ──────────────────────────────────────────────────────────────
+// ─── Page Header ─────────────────────────────────────────────────────────────
 export function PageHeader({ title, subtitle, action }: { title: string; subtitle?: string; action?: ReactNode }) {
   return (
     <div className={styles.pageHeader}>
@@ -44,19 +37,19 @@ export function PageHeader({ title, subtitle, action }: { title: string; subtitl
   );
 }
 
-// ── Badge ────────────────────────────────────────────────────────────────────
+// ─── Badge ───────────────────────────────────────────────────────────────────
 type BadgeVariant = 'teal' | 'yellow' | 'green' | 'red' | 'gray';
 export function Badge({ label, variant = 'gray' }: { label: string; variant?: BadgeVariant }) {
   return <span className={`${styles.badge} ${styles[`badge_${variant}`]}`}>{label}</span>;
 }
 
-// ── Spinner ──────────────────────────────────────────────────────────────────
+// ─── Spinner ─────────────────────────────────────────────────────────────────
 export function Spinner({ size = 24 }: { size?: number }) {
-  return <Loader2 size={size} className={styles.spinIcon} style={{ color: 'var(--teal)' }} />;
+  return <span className={styles.spinner} style={{ width: size, height: size }} />;
 }
 
-// ── Empty State ──────────────────────────────────────────────────────────────
-export function EmptyState({ icon, title, description }: { icon: ReactNode; title: string; description?: string }) {
+// ─── Empty State ─────────────────────────────────────────────────────────────
+export function EmptyState({ icon, title, description }: { icon: string; title: string; description?: string }) {
   return (
     <div className={styles.empty}>
       <div className={styles.emptyIcon}>{icon}</div>
@@ -66,7 +59,7 @@ export function EmptyState({ icon, title, description }: { icon: ReactNode; titl
   );
 }
 
-// ── Form Field ───────────────────────────────────────────────────────────────
+// ─── Form Field ──────────────────────────────────────────────────────────────
 export function Field({ label, error, children }: { label: string; error?: string; children: ReactNode }) {
   return (
     <div className={styles.field}>
@@ -77,18 +70,12 @@ export function Field({ label, error, children }: { label: string; error?: strin
   );
 }
 
-// ── Alert ────────────────────────────────────────────────────────────────────
+// ─── Alert ───────────────────────────────────────────────────────────────────
 export function Alert({ message, type = 'error' }: { message: string; type?: 'error' | 'success' }) {
-  const Icon = type === 'success' ? CheckCircle2 : AlertCircle;
-  return (
-    <div className={`${styles.alert} ${styles[`alert_${type}`]}`}>
-      <Icon size={15} style={{ flexShrink: 0 }} />
-      <span>{message}</span>
-    </div>
-  );
+  return <div className={`${styles.alert} ${styles[`alert_${type}`]}`}>{message}</div>;
 }
 
-// ── Modal ────────────────────────────────────────────────────────────────────
+// ─── Modal ───────────────────────────────────────────────────────────────────
 export function Modal({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: ReactNode }) {
   if (!open) return null;
   return (
@@ -96,7 +83,7 @@ export function Modal({ open, onClose, title, children }: { open: boolean; onClo
       <div className={styles.modal} onClick={e => e.stopPropagation()}>
         <div className={styles.modalHeader}>
           <h2 className={styles.modalTitle}>{title}</h2>
-          <button className={styles.modalClose} onClick={onClose}><X size={16} /></button>
+          <button className={styles.modalClose} onClick={onClose}>✕</button>
         </div>
         <div className={styles.modalBody}>{children}</div>
       </div>
@@ -104,11 +91,11 @@ export function Modal({ open, onClose, title, children }: { open: boolean; onClo
   );
 }
 
-// ── Stat Card ────────────────────────────────────────────────────────────────
-export function StatCard({ icon, label, value }: { icon: ReactNode; label: string; value: string | number }) {
+// ─── Stat Card ───────────────────────────────────────────────────────────────
+export function StatCard({ icon, label, value, color = 'teal' }: { icon: string; label: string; value: string | number; color?: string }) {
   return (
     <div className={styles.statCard}>
-      <div className={styles.statIcon}>{icon}</div>
+      <div className={styles.statIcon} style={{ color: `var(--${color})`, background: `rgba(var(--${color}-rgb, 10,181,168),0.12)` }}>{icon}</div>
       <div>
         <div className={styles.statValue}>{value}</div>
         <div className={styles.statLabel}>{label}</div>
@@ -117,85 +104,68 @@ export function StatCard({ icon, label, value }: { icon: ReactNode; label: strin
   );
 }
 
-// ── Pagination ───────────────────────────────────────────────────────────────
-interface PaginationProps {
-  total:    number;
-  page:     number;
-  pageSize: number;
-  onChange: (page: number) => void;
-}
+// ─── Pagination ──────────────────────────────────────────────────────────────
+export function Pagination({ total, page, pageSize, onChange }: {
+  total: number; page: number; pageSize: number; onChange: (p: number) => void;
+}) {
+  const pages = Math.ceil(total / pageSize);
+  if (pages <= 1) return null;
+  const start = (page - 1) * pageSize + 1;
+  const end   = Math.min(page * pageSize, total);
 
-export function Pagination({ total, page, pageSize, onChange }: PaginationProps) {
-  const totalPages = Math.ceil(total / pageSize);
-  if (totalPages <= 1) return null;
-
-  const from = (page - 1) * pageSize + 1;
-  const to   = Math.min(page * pageSize, total);
-
-  // Build page window: always show first, last, current ± 1, with ellipsis
-  const pages: (number | '…')[] = [];
-  const add = (n: number) => { if (!pages.includes(n)) pages.push(n); };
-
-  add(1);
-  if (page > 3) pages.push('…');
-  for (let i = Math.max(2, page - 1); i <= Math.min(totalPages - 1, page + 1); i++) add(i);
-  if (page < totalPages - 2) pages.push('…');
-  if (totalPages > 1) add(totalPages);
+  const nums: (number | '...')[] = [];
+  if (pages <= 7) {
+    for (let i = 1; i <= pages; i++) nums.push(i);
+  } else {
+    nums.push(1);
+    if (page > 3) nums.push('...');
+    for (let i = Math.max(2, page - 1); i <= Math.min(pages - 1, page + 1); i++) nums.push(i);
+    if (page < pages - 2) nums.push('...');
+    nums.push(pages);
+  }
 
   return (
-    <div className={styles.pagination}>
-      <span className={styles.paginationInfo}>
-        {from}–{to} de {total}
-      </span>
-      <div className={styles.paginationPages}>
-        <button
-          className={styles.pageBtn}
-          onClick={() => onChange(page - 1)}
-          disabled={page === 1}
-          aria-label="Página anterior"
-        >
-          ‹
-        </button>
-        {pages.map((p, i) =>
-          p === '…' ? (
-            <span key={`e${i}`} className={styles.pageEllipsis}>…</span>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, marginTop: 20 }}>
+      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'center' }}>
+        <button onClick={() => onChange(page - 1)}
+          disabled={page <= 1}
+          style={{ minWidth: 32, height: 32, borderRadius: 7, border: '1px solid var(--border)', background: 'transparent', color: 'var(--cream-dim)', cursor: 'pointer', fontSize: 13, opacity: page <= 1 ? 0.4 : 1 }}>‹</button>
+        {nums.map((n, i) =>
+          n === '...' ? (
+            <span key={`e${i}`} style={{ padding: '0 4px', color: 'var(--cream-dim)', lineHeight: '32px' }}>…</span>
           ) : (
-            <button
-              key={p}
-              className={`${styles.pageBtn} ${p === page ? styles.pageBtnActive : ''}`}
-              onClick={() => onChange(p as number)}
-            >
-              {p}
+            <button key={n} onClick={() => onChange(n as number)}
+              style={{ minWidth: 32, height: 32, borderRadius: 7, border: `1px solid ${n === page ? 'var(--teal)' : 'var(--border)'}`, background: n === page ? 'var(--teal)' : 'transparent', color: n === page ? '#fff' : 'var(--cream-dim)', cursor: 'pointer', fontSize: 13, fontWeight: n === page ? 700 : 400 }}>
+              {n}
             </button>
           )
         )}
-        <button
-          className={styles.pageBtn}
-          onClick={() => onChange(page + 1)}
-          disabled={page === totalPages}
-          aria-label="Página siguiente"
-        >
-          ›
-        </button>
+        <button onClick={() => onChange(page + 1)} disabled={page >= pages}
+          style={{ minWidth: 32, height: 32, borderRadius: 7, border: '1px solid var(--border)', background: 'transparent', color: 'var(--cream-dim)', cursor: 'pointer', fontSize: 13 }}>›</button>
       </div>
+      <div style={{ fontSize: 12, color: 'var(--cream-dim)' }}>{start}–{end} de {total}</div>
     </div>
   );
 }
 
-// ── usePagination hook ───────────────────────────────────────────────────────
-export function usePagination<T>(items: T[], pageSize = 9) {
-  const [page, setPage] = useState(1);
+// ─── usePagination ───────────────────────────────────────────────────────────
+import { useState as _useState, useEffect as _useEffect } from 'react';
+export function usePagination<T>(items: T[], pageSize: number) {
+  const [page, setPage] = _useState(1);
+  const total  = items.length;
+  const pages  = Math.max(1, Math.ceil(total / pageSize));
+  const safe   = Math.min(page, pages);
+  const start  = (safe - 1) * pageSize;
+  const slice  = items.slice(start, start + pageSize);
 
-  // Reset to page 1 whenever the list changes (e.g. after a search filter)
-  const total    = items.length;
-  const safePage = Math.min(page, Math.max(1, Math.ceil(total / pageSize)));
+  _useEffect(() => {
+    if (page > pages && pages > 0) setPage(pages);
+  }, [items.length]);
 
-  const slice = items.slice((safePage - 1) * pageSize, safePage * pageSize);
-
-  const changePage = (p: number) => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+  const setPageSafe = (p: number) => {
     setPage(p);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  return { page: safePage, setPage: changePage, slice, total, pageSize };
+  return { page: safe, setPage: setPageSafe, slice, total, pageSize };
 }

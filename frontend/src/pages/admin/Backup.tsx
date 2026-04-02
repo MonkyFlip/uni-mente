@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
 import {
-  Database, Download, RotateCcw, Settings, Clock, ArrowDownToLine,
+  Database, Settings, Clock,
   FileText, FileJson, FileSpreadsheet, File,
-  Layers, GitBranch, GitCommit, Play,
+  Layers, GitBranch, GitCommit,
   CheckCircle2, AlertTriangle, ShieldCheck,
 } from 'lucide-react';
 import { Layout } from '../../components/Layout';
@@ -52,7 +52,7 @@ function fmtKb(kb: number | null) {
 
 export default function Backup() {
   const { data: dataBackups, loading: lB, refetch: rB } = useQuery(GET_BACKUPS,       { fetchPolicy: 'network-only' });
-  const { data: dataConfig,  refetch: rC } = useQuery(GET_BACKUP_CONFIG, { fetchPolicy: 'network-only' });
+  const { data: dataConfig, refetch: rC } = useQuery(GET_BACKUP_CONFIG, { fetchPolicy: 'network-only' });
 
   const backups: any[] = dataBackups?.listarBackups ?? [];
   const config: any    = dataConfig?.configBackupAutomatico ?? null;
@@ -64,7 +64,6 @@ export default function Backup() {
   // ── Modal: confirmar backup con MFA ───────────────────────────
   const [showConfirmBackup, setShowConfirmBackup] = useState(false);
   const [confirmMfa,        setConfirmMfa]        = useState('');
-  const [backupError,       setBackupError]       = useState('');
 
   // ── Modal: configuración automática ──────────────────────────
   const [showAuto,    setShowAuto]    = useState(false);
@@ -80,90 +79,13 @@ export default function Backup() {
   const [successMsg, setSuccessMsg] = useState('');
   const ok = (msg: string) => { setSuccessMsg(msg); setTimeout(() => setSuccessMsg(''), 5000); };
 
-  /**
-   * SECURITY — OWASP A03/CWE-79 DOM-based XSS:
-   *   El nombre del archivo proviene de un recurso remoto (respuesta de la API).
-   *   Si se usara directamente en document.createElement/innerHTML podría
-   *   ejecutar código malicioso si el servidor fuera comprometido.
-   *
-   *   Mitigación aplicada (Defense in depth):
-   *   1. sanitizeFilename(): elimina cualquier carácter fuera del patrón seguro
-   *      antes de asignarlo a atributos del DOM.
-   *   2. Se usa a.download (atributo seguro) en lugar de innerHTML o innerText.
-   *   3. Se verifica que el nombre cumpla el patrón de backups del sistema.
-   *   4. URL.createObjectURL genera una URL blob local — nunca se inserta
-   *      contenido externo directamente en el DOM.
-   *
-   * OWASP: Output Encoding / Input Validation — A03:2021 Injection
-   */
-  const sanitizeFilename = (name: string): string => {
-    // Allowlist: solo caracteres seguros para nombres de archivo de backup
-    // Patrón: backup_TIPO_DD-MM-YYYY_HH-MMam.ext
-    const ALLOWED = /^backup_[A-Za-z]+_\d{2}-\d{2}-\d{4}_\d{2}-\d{2}(?:am|pm)\.(sql|json|xlsx|csv)$/i;
-    const clean   = name.replace(/[^a-zA-Z0-9_.\-]/g, '');  // eliminar chars peligrosos
-    if (!ALLOWED.test(clean)) {
-      throw new Error(`Nombre de archivo no permitido: ${clean}`);
-    }
-    return clean;
-  };
-
-  const handleDescargar = async (nombre_archivo: string) => {
-    try {
-      // ── 1. Sanitizar el nombre antes de usarlo en el DOM ─────────
-      const safeFilename = sanitizeFilename(nombre_archivo);
-
-      const token = localStorage.getItem('token');
-      const res   = await fetch(
-        // encodeURIComponent protege la URL de inyección de segmentos
-        `http://localhost:3000/api/backup-download/${encodeURIComponent(safeFilename)}`,
-        { headers: { Authorization: token ? `Bearer ${token}` : '' } },
-      );
-      if (!res.ok) { ok('No se pudo descargar el archivo.'); return; }
-
-      const blob = await res.blob();
-
-      // ── 2. Verificar el Content-Type recibido ─────────────────────
-      // Evita que un blob con tipo text/html se abra como página
-      const contentType = res.headers.get('content-type') ?? '';
-      const ALLOWED_TYPES = ['application/sql', 'application/json',
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'text/csv', 'application/octet-stream'];
-      if (!ALLOWED_TYPES.some(t => contentType.startsWith(t))) {
-        ok('Tipo de archivo no permitido.');
-        return;
-      }
-
-      // ── 3. Descarga sin manipulación del DOM (OWASP A03/CWE-79) ────
-      // Se elimina document.body.appendChild() por completo.
-      // Los navegadores modernos permiten llamar .click() en un elemento
-      // que nunca se inserta en el documento — esto corta el flujo
-      // "remote data → DOM" que Snyk detecta como DOM-based XSS.
-      //
-      // El blob se crea a partir de una respuesta verificada (Content-Type
-      // validado arriba). La URL blob es local — nunca proviene de la red.
-      const url = URL.createObjectURL(blob);
-      const a   = document.createElement('a');
-      a.href     = url;
-      a.download = safeFilename;    // nombre sanitizado por allowlist regex
-      // NO se llama appendChild — el click funciona sin insertar en el DOM
-      a.click();
-      URL.revokeObjectURL(url);     // liberar memoria inmediatamente
-    } catch (e: any) {
-      ok(`Error al descargar: ${e.message ?? 'Verifica que el servidor esté activo.'}`);
-    }
-  };
-
   // ── Mutations ─────────────────────────────────────────────────
-  const [crearBackup, { loading: creating }] = useMutation(CREAR_BACKUP, {
+  const [crearBackup, { loading: creating, error: errCreate }] = useMutation(CREAR_BACKUP, {
     onCompleted: (d) => {
       ok(`Backup creado: ${d.crearBackup.nombre_archivo} (${fmtKb(d.crearBackup.tamanio_kb)})`);
       setShowConfirmBackup(false);
       setConfirmMfa('');
-      setBackupError('');
       rB();
-    },
-    onError: (e) => {
-      setBackupError(e.message.replace('GraphQL error: ', ''));
     },
   });
 
@@ -191,21 +113,14 @@ export default function Backup() {
   /** El botón de crear abre el modal de confirmación MFA */
   const handleClickCrear = () => {
     setConfirmMfa('');
-    setBackupError('');
     setShowConfirmBackup(true);
   };
 
-  /** Confirmación desde el modal — siempre envía codigo_mfa */
+  /** Confirmación desde el modal */
   const handleConfirmBackup = () => {
-    crearBackup({
-      variables: {
-        input: {
-          tipo:       manTipo,
-          formato:    manFormato,
-          codigo_mfa: confirmMfa.trim() !== '' ? confirmMfa.trim() : undefined,
-        },
-      },
-    });
+    const input: any = { tipo: manTipo, formato: manFormato };
+    if (confirmMfa.trim()) input.codigo_mfa = confirmMfa.trim();
+    crearBackup({ variables: { input } });
   };
 
   const handleAuto = (e: React.FormEvent) => {
@@ -273,15 +188,12 @@ export default function Backup() {
             </div>
 
             {/* Botón — abre modal de confirmación MFA */}
-            <div className={styles.createBtn}>
-              <Button
-                style={{ width: '100%' }}
-                icon={<Download size={15} />}
-                onClick={handleClickCrear}
-              >
-                Crear respaldo {manTipo} en {manFormato}
-              </Button>
-            </div>
+            <Button
+
+              onClick={handleClickCrear}
+            >
+              Crear respaldo {manTipo} en {manFormato}
+            </Button>
           </Card>
 
           {/* Lista de backups */}
@@ -313,24 +225,13 @@ export default function Backup() {
                     </div>
                     <div className={styles.backupDate}>{fmtDate(b.created_at)}</div>
                   </div>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <Button
-                      variant="secondary" size="sm"
-                      icon={<ArrowDownToLine size={13} />}
-                      onClick={() => handleDescargar(b.nombre_archivo)}
-                      title="Descargar backup"
-                    >
-                      Descargar
-                    </Button>
-                    <Button
-                      variant="secondary" size="sm"
-                      icon={<RotateCcw size={13} />}
-                      onClick={() => { setRestoreTarget(b); setRestoreMfa(''); }}
-                      title="Restaurar base de datos"
-                    >
-                      Restaurar
-                    </Button>
-                  </div>
+                  <Button
+                    variant="secondary" size="sm"
+
+                    onClick={() => { setRestoreTarget(b); setRestoreMfa(''); }}
+                  >
+                    Restaurar
+                  </Button>
                 </div>
               ))}
             </div>
@@ -357,7 +258,7 @@ export default function Backup() {
                 <div className={styles.configDetail}>Último backup: <strong>{fmtDate(config.ultima_ejecucion)}</strong></div>
                 <Button
                   size="sm" variant="secondary"
-                  icon={<Settings size={13} />}
+
                   style={{ marginTop: 10, width: '100%' }}
                   onClick={() => {
                     setAutoTipo(config.tipo);
@@ -373,7 +274,7 @@ export default function Backup() {
               <div className={styles.noConfig}>
                 <Clock size={32} style={{ color: 'var(--cream-dim)', opacity: 0.4 }} />
                 <p>No hay backup automático configurado.</p>
-                <Button icon={<Play size={14} />} style={{ width: '100%' }} onClick={() => setShowAuto(true)}>
+                <Button style={{ width: '100%' }} onClick={() => setShowAuto(true)}>
                   Configurar automático
                 </Button>
               </div>
@@ -398,10 +299,10 @@ export default function Backup() {
       {/* ══ Modal: Confirmar backup con MFA ══════════════════════ */}
       <Modal
         open={showConfirmBackup}
-        onClose={() => { setShowConfirmBackup(false); setConfirmMfa(''); setBackupError(''); }}
+        onClose={() => { setShowConfirmBackup(false); setConfirmMfa(''); }}
         title="Confirmar respaldo"
       >
-        {backupError && <Alert message={backupError} />}
+        {errCreate && <Alert message={errCreate.message.replace('GraphQL error: ', '')} />}
 
         {/* Resumen de lo que se va a crear */}
         <div className={styles.confirmSummary}>
@@ -433,7 +334,7 @@ export default function Backup() {
           </div>
           <p className={styles.mfaHint}>
             Ingresa el código de 6 dígitos de tu app autenticadora para autorizar esta operación.
-            Este paso es obligatorio — debes tener MFA configurado en tu cuenta.
+            Si aún no has configurado MFA, deja este campo vacío.
           </p>
           <input
             type="text"
@@ -441,7 +342,7 @@ export default function Backup() {
             maxLength={6}
             autoFocus
             value={confirmMfa}
-            onChange={e => { setConfirmMfa(e.target.value.replace(/\D/g, '')); setBackupError(''); }}
+            onChange={e => setConfirmMfa(e.target.value.replace(/\D/g, ''))}
             placeholder="123456"
             className={styles.mfaInputLarge}
           />
@@ -451,15 +352,14 @@ export default function Backup() {
           <Button
             variant="secondary"
             style={{ flex: 1 }}
-            onClick={() => { setShowConfirmBackup(false); setConfirmMfa(''); setBackupError(''); }}
+            onClick={() => { setShowConfirmBackup(false); setConfirmMfa(''); }}
           >
             Cancelar
           </Button>
           <Button
             loading={creating}
-            disabled={confirmMfa.length !== 6}
             style={{ flex: 2 }}
-            icon={<Download size={15} />}
+
             onClick={handleConfirmBackup}
           >
             Crear respaldo
@@ -501,7 +401,7 @@ export default function Backup() {
           </Field>
           <div style={{ display: 'flex', gap: 10 }}>
             <Button variant="secondary" style={{ flex: 1 }} onClick={() => setShowAuto(false)}>Cancelar</Button>
-            <Button type="submit" loading={configuring} style={{ flex: 2 }} icon={<Play size={14} />}
+            <Button type="submit" loading={configuring} style={{ flex: 2 }}
               disabled={autoMfa.length < 6}>
               Guardar y ejecutar backup inicial
             </Button>
@@ -529,7 +429,7 @@ export default function Backup() {
             </div>
           </div>
         </div>
-        <div style={{ marginTop: 16 }}><Field label="Código MFA (obligatorio)">
+        <div style={{ marginTop: 16 }}><Field label="Código MFA para confirmar">
           <input
             type="text" inputMode="numeric" maxLength={6} autoFocus
             value={restoreMfa}
@@ -540,8 +440,7 @@ export default function Backup() {
         </Field></div>
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
           <Button variant="secondary" onClick={() => setRestoreTarget(null)}>Cancelar</Button>
-          <Button variant="danger" loading={restoring} disabled={restoreMfa.length !== 6}
-            icon={<RotateCcw size={14} />} onClick={handleRestore}>
+          <Button variant="danger" loading={restoring} disabled={restoreMfa.length !== 6} onClick={handleRestore}>
             Restaurar base de datos
           </Button>
         </div>

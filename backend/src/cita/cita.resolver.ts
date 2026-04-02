@@ -21,4 +21,13 @@ export class CitaResolver {
   citasEstudiante(@Args('id_estudiante', { type: () => Int }) id_estudiante: number): Promise<Cita[]> { return this.service.citasEstudiante(id_estudiante); }
   @Query(() => [Cita])
   agendaPsicologo(@Args('id_psicologo', { type: () => Int }) id_psicologo: number): Promise<Cita[]> { return this.service.agendaPsicologo(id_psicologo); }
+
+  // JWT-resolved queries — no id parameter needed
+  @UseGuards(RolesGuard) @Roles(RolNombre.ESTUDIANTE)
+  @Query(() => [Cita], { name: 'misCitas' })
+  misCitas(@CurrentUser() user: any): Promise<Cita[]> { return this.service.citasEstudiante(user.id_perfil); }
+
+  @UseGuards(RolesGuard) @Roles(RolNombre.PSICOLOGO)
+  @Query(() => [Cita], { name: 'miAgenda' })
+  miAgenda(@CurrentUser() user: any): Promise<Cita[]> { return this.service.agendaPsicologo(user.id_perfil); }
 }

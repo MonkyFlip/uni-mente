@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
-import { UserPlus, Edit2, Trash2, Search, Stethoscope, Phone, BadgeCheck } from 'lucide-react';
+import { Edit2, Search, Stethoscope, Phone, BadgeCheck, UserX, UserCheck } from 'lucide-react';
 import { Layout } from '../../components/Layout';
 import {
   PageHeader, Card, Button, EmptyState, Spinner,
   Modal, Field, Alert, Badge, Pagination, usePagination,
 } from '../../components/UI';
-import { GET_PSICOLOGOS, REGISTRAR_PSICOLOGO, ACTUALIZAR_PSICOLOGO } from '../../graphql/operations';
+import {
+  GET_PSICOLOGOS_ADMIN, REGISTRAR_PSICOLOGO, ACTUALIZAR_PSICOLOGO, TOGGLE_ACTIVO_PSICOLOGO,
+} from '../../graphql/operations';
 import styles from './Psicologos.module.css';
 
 const PAGE_SIZE = 9;
@@ -24,11 +26,11 @@ const emptyCreate = { nombre: '', correo: '', password: '', especialidad: '', ce
 const emptyEdit   = { especialidad: '', cedula: '', telefono: '' };
 
 export default function AdminPsicologos() {
-  const { data, loading, refetch } = useQuery(GET_PSICOLOGOS);
+  const { data, loading, refetch } = useQuery(GET_PSICOLOGOS_ADMIN, { fetchPolicy: 'cache-and-network' });
   const [search,       setSearch]       = useState('');
+  const [filtro,       setFiltro]       = useState<'todos'|'activos'|'inactivos'>('activos');
   const [showCreate,   setShowCreate]   = useState(false);
   const [editTarget,   setEditTarget]   = useState<any>(null);
-  const [deleteTarget, setDeleteTarget] = useState<any>(null);
   const [createForm,   setCreateForm]   = useState(emptyCreate);
   const [editForm,     setEditForm]     = useState(emptyEdit);
   const [success,      setSuccess]      = useState('');
@@ -48,22 +50,28 @@ export default function AdminPsicologos() {
     onCompleted: () => { ok('Psicólogo actualizado.'); setEditTarget(null); refetch(); },
   });
 
-  // Filtrado por búsqueda
-  const todos = (data?.psicologos ?? []).filter((p: any) =>
-    p.usuario.nombre.toLowerCase().includes(search.toLowerCase()) ||
-    (p.especialidad ?? '').toLowerCase().includes(search.toLowerCase())
-  );
+  const [toggleActivo, { loading: toggling }] = useMutation(TOGGLE_ACTIVO_PSICOLOGO, {
+    onCompleted: (d) => {
+      const p = d.toggleActivoPsicologo;
+      ok(`${p.usuario.nombre} ${p.usuario.activo ? 'activado' : 'desactivado'}.`);
+      refetch();
+    },
+  });
 
-  // Paginación
+  const todos = ((data?.psicologosAdmin ?? []) as any[])
+    .filter((p: any) => {
+      const matchSearch =
+        p.usuario.nombre.toLowerCase().includes(search.toLowerCase()) ||
+        (p.especialidad ?? '').toLowerCase().includes(search.toLowerCase());
+      const matchActive = filtro === 'todos' ? true : filtro === 'activos' ? p.usuario.activo : !p.usuario.activo;
+      return matchSearch && matchActive;
+    });
+
   const { page, setPage, slice: pagina, total } = usePagination(todos, PAGE_SIZE);
 
   const openEdit = (p: any) => {
     setEditTarget(p);
-    setEditForm({
-      especialidad: p.especialidad ?? '',
-      cedula:       p.cedula       ?? '',
-      telefono:     p.telefono     ?? '',
-    });
+    setEditForm({ especialidad: p.especialidad ?? '', cedula: p.cedula ?? '', telefono: p.telefono ?? '' });
   };
 
   const setC = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
@@ -89,7 +97,7 @@ export default function AdminPsicologos() {
         title="Psicólogos"
         subtitle={`${total} profesional${total !== 1 ? 'es' : ''} registrado${total !== 1 ? 's' : ''}`}
         action={
-          <Button variant="primary" icon={<UserPlus size={16} />} onClick={() => setShowCreate(true)}>
+          <Button variant="primary"  onClick={() => setShowCreate(true)}>
             Registrar psicólogo
           </Button>
         }
@@ -97,31 +105,42 @@ export default function AdminPsicologos() {
 
       {success && <div style={{ marginBottom: 16 }}><Alert message={success} type="success" /></div>}
 
-      <div className={styles.searchBar}>
-        <Search size={15} className={styles.searchIcon} />
-        <input
-          className={styles.searchInput}
-          placeholder="Buscar por nombre o especialidad..."
-          value={search}
-          onChange={e => { setSearch(e.target.value); setPage(1); }}
-        />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
+        <div className={styles.searchBar}>
+          <Search size={15} className={styles.searchIcon} />
+          <input
+            className={styles.searchInput}
+            placeholder="Buscar por nombre o especialidad..."
+            value={search}
+            onChange={e => { setSearch(e.target.value); setPage(1); }}
+          />
+        </div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {(['todos','activos','inactivos'] as const).map(f => (
+            <button key={f} onClick={() => { setFiltro(f); setPage(1); }}
+              style={{ padding: '7px 14px', borderRadius: 20, cursor: 'pointer', transition: 'all 0.15s', fontSize: 12, fontWeight: 600,
+                border: `1px solid ${filtro === f ? 'var(--teal)' : 'var(--border)'}`,
+                background: filtro === f ? 'var(--teal-glow)' : 'transparent',
+                color: filtro === f ? 'var(--teal)' : 'var(--cream-dim)',
+              }}>
+              {f.charAt(0).toUpperCase() + f.slice(1)}
+            </button>
+          ))}
+        </div>
       </div>
 
       {loading && <div style={{ display: 'flex', justifyContent: 'center', padding: 64 }}><Spinner size={36} /></div>}
       {!loading && todos.length === 0 && (
         <EmptyState
-          icon={<UserPlus size={28} />}
+          icon="👤"
           title="Sin psicólogos"
-          description={search
-            ? 'Ningún psicólogo coincide con la búsqueda.'
-            : 'Registra el primer psicólogo con el botón de arriba.'
-          }
+          description={search ? 'Ningún psicólogo coincide con la búsqueda.' : 'Registra el primer psicólogo con el botón de arriba.'}
         />
       )}
 
       <div className={`${styles.grid} stagger`}>
         {pagina.map((p: any) => (
-          <Card key={p.id_psicologo} className={styles.card}>
+          <div key={p.id_psicologo} style={{ opacity: p.usuario.activo ? 1 : 0.65, transition: "opacity 0.2s" }}><Card className={styles.card}>
             <div className={styles.cardTop}>
               <div className={styles.avatar}>{p.usuario.nombre.charAt(0)}</div>
               <div className={styles.info}>
@@ -129,17 +148,16 @@ export default function AdminPsicologos() {
                 <div className={styles.correo}>{p.usuario.correo}</div>
               </div>
               <div className={styles.cardActions}>
-                <button type="button" className={styles.iconBtn} title="Editar" onClick={() => openEdit(p)} style={{ color: 'var(--cream-dim)' }}>
+                <button className={styles.iconBtn} title="Editar" onClick={() => openEdit(p)}>
                   <Edit2 size={15} strokeWidth={1.8} />
                 </button>
                 <button
-                  type="button"
-                  className={`${styles.iconBtn} ${styles.iconBtnDanger}`}
-                  title="Eliminar"
-                  onClick={() => setDeleteTarget(p)}
-                  style={{ color: 'var(--cream-dim)' }}
+                  className={`${styles.iconBtn} ${!p.usuario.activo ? '' : styles.iconBtnDanger}`}
+                  title={p.usuario.activo ? 'Desactivar' : 'Activar'}
+                  onClick={() => toggleActivo({ variables: { id: p.id_psicologo } })}
+                  disabled={toggling}
                 >
-                  <Trash2 size={15} strokeWidth={1.8} />
+                  {p.usuario.activo ? <UserX size={15} strokeWidth={1.8} /> : <UserCheck size={15} strokeWidth={1.8} />}
                 </button>
               </div>
             </div>
@@ -150,13 +168,12 @@ export default function AdminPsicologos() {
               {p.telefono     && <div className={styles.detail}><Phone       size={13} /><span>{p.telefono}</span></div>}
             </div>
 
-            <div className={styles.horarioCount}>
-              <Badge
-                label={`${p.horarios?.length ?? 0} horarios`}
-                variant={p.horarios?.length > 0 ? 'teal' : 'gray'}
-              />
+            <div className={styles.horarioCount} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <Badge label={`${p.horarios?.length ?? 0} Horarios`} variant={p.horarios?.length > 0 ? 'teal' : 'gray'} />
+              <Badge label={p.usuario.activo ? 'Activo' : 'Inactivo'} variant={p.usuario.activo ? 'teal' : 'gray'} />
             </div>
           </Card>
+          </div>
         ))}
       </div>
 
@@ -186,7 +203,7 @@ export default function AdminPsicologos() {
             <input placeholder="12345678" value={createForm.cedula} onChange={setC('cedula')} />
           </Field>
           <div className={styles.modalFull}>
-            <Button type="submit" loading={creando} size="lg" style={{ width: '100%' }} icon={<UserPlus size={16} />}>
+            <Button type="submit" loading={creando} size="lg" style={{ width: '100%' }} >
               Registrar
             </Button>
           </div>
@@ -206,26 +223,10 @@ export default function AdminPsicologos() {
           <Field label="Teléfono">
             <input value={editForm.telefono} onChange={setE('telefono')} placeholder="5559876543" />
           </Field>
-          <Button type="submit" loading={editando} size="lg" style={{ width: '100%' }} icon={<Edit2 size={16} />}>
+          <Button type="submit" loading={editando} size="lg" style={{ width: '100%' }} >
             Guardar cambios
           </Button>
         </form>
-      </Modal>
-
-      {/* DELETE */}
-      <Modal open={!!deleteTarget} onClose={() => setDeleteTarget(null)} title="Eliminar psicólogo">
-        <p style={{ color: 'var(--cream-dim)', fontSize: 14, lineHeight: 1.6 }}>
-          ¿Estás seguro de eliminar a{' '}
-          <strong style={{ color: 'var(--cream)' }}>{deleteTarget?.usuario?.nombre}</strong>?
-          Esta acción eliminará también todos sus horarios y citas asociadas.
-        </p>
-        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
-          <Button variant="secondary" onClick={() => setDeleteTarget(null)}>Cancelar</Button>
-          <Button variant="danger" icon={<Trash2 size={14} strokeWidth={1.8} />}
-            onClick={() => setDeleteTarget(null)}>
-            Eliminar
-          </Button>
-        </div>
       </Modal>
     </Layout>
   );

@@ -2,7 +2,7 @@ import { useAuth } from '../../auth/AuthContext';
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
 import { Layout } from '../../components/Layout';
-import { PageHeader, Badge, Button, EmptyState, Spinner, Alert, Modal, Field } from '../../components/UI';
+import { PageHeader, Badge, Button, EmptyState, Spinner, Alert, Modal, Field, Pagination, usePagination } from '../../components/UI';
 import { GET_MI_AGENDA, GET_PSICOLOGOS, GET_AGENDA_PSICOLOGO, CAMBIAR_ESTADO_CITA, REGISTRAR_SESION } from '../../graphql/operations';
 import styles from './Agenda.module.css';
 
@@ -36,6 +36,7 @@ export default function Agenda() {
   const loading = l1 || l2;
   const data = miData ? { agendaPsicologo: miData.miAgenda } : explicitData;
 
+  const [filtro, setFiltro] = useState<'todos'|'pendiente'|'asistida'|'cancelada'>('todos');
   const [selectedCita, setSelectedCita] = useState<any>(null);
   const [sesionForm, setSesionForm] = useState({ notas: '', recomendaciones: '', numero_sesion: 1 });
 
@@ -44,9 +45,14 @@ export default function Agenda() {
     onCompleted: () => { setSelectedCita(null); refetch(); },
   });
 
-  const citas = data?.agendaPsicologo ?? [];
-  const pendientes = citas.filter((c: any) => c.estado?.toUpperCase() === 'PENDIENTE');
-  const historial  = citas.filter((c: any) => c.estado?.toUpperCase() !== 'PENDIENTE');
+  const allCitas: any[] = (data?.agendaPsicologo ?? [])
+    .slice()
+    .sort((a: any, b: any) => {
+      const aPend = a.estado?.toUpperCase() === 'PENDIENTE';
+      const bPend = b.estado?.toUpperCase() === 'PENDIENTE';
+      if (aPend !== bPend) return aPend ? -1 : 1;
+      return new Date(a.fecha).getTime() - new Date(b.fecha).getTime();
+    });
 
   const handleRegistrarSesion = (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,6 +61,11 @@ export default function Agenda() {
     });
   };
 
+  const filteredCitas = filtro === 'todos'
+    ? allCitas
+    : allCitas.filter((c: any) => c.estado?.toUpperCase() === filtro.toUpperCase());
+  const { page: agendaPage, setPage: agendaSetPage, slice: agendaSlice, total: agendaTotal, pageSize: agendaPageSize } = usePagination(filteredCitas, 10);
+
   return (
     <Layout>
       <PageHeader title="Mi Agenda" subtitle="Gestiona tus citas y registra sesiones" />
@@ -62,33 +73,38 @@ export default function Agenda() {
       {loading && <div style={{ textAlign: 'center', padding: 60 }}><Spinner size={36} /></div>}
       {error && <Alert message={error.message} />}
 
-      {pendientes.length > 0 && (
-        <section className={styles.section}>
-          <h3 className={styles.sectionTitle}>Próximas citas <span className={styles.count}>{pendientes.length}</span></h3>
-          <div className={styles.list}>
-            {pendientes.map((cita: any) => (
-              <CitaRow key={cita.id_cita} cita={cita}
-                onAsistida={() => cambiarEstado({ variables: { id_cita: cita.id_cita, input: { estado: 'asistida' } } })}
-                onCancelar={() => cambiarEstado({ variables: { id_cita: cita.id_cita, input: { estado: 'cancelada' } } })}
-                onSesion={() => { setSelectedCita(cita); setSesionForm({ notas: '', recomendaciones: '', numero_sesion: 1 }); }}
-              />
-            ))}
-          </div>
-        </section>
+      {/* Filtros */}
+      <div style={{ display:'flex', gap:8, marginBottom:20, flexWrap:'wrap' }}>
+        {(['todos','pendiente','asistida','cancelada'] as const).map(f => {
+          const count = f === 'todos' ? allCitas.length : allCitas.filter(c => c.estado?.toUpperCase() === f.toUpperCase()).length;
+          return (
+            <button key={f} onClick={() => { setFiltro(f); agendaSetPage(1); }}
+              style={{ padding:'7px 16px', borderRadius:20, cursor:'pointer', transition:'all 0.15s', fontSize:13, fontWeight:600,
+                border:`1px solid ${filtro===f ? 'var(--teal)' : 'var(--border)'}`,
+                background:filtro===f ? 'var(--teal-glow)' : 'transparent',
+                color:filtro===f ? 'var(--teal)' : 'var(--cream-dim)' }}>
+              {f.charAt(0).toUpperCase()+f.slice(1)}
+              <span style={{ marginLeft:5, opacity:.7, fontSize:11 }}>({count})</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {!loading && filteredCitas.length === 0 && (
+        <EmptyState icon="📅" title="Sin citas"
+          description={filtro === 'todos' ? 'No tienes citas aún.' : `Sin citas con estado "${filtro}".`} />
       )}
 
-      {historial.length > 0 && (
-        <section className={styles.section}>
-          <h3 className={styles.sectionTitle}>Historial</h3>
-          <div className={styles.list}>
-            {historial.map((cita: any) => <CitaRow key={cita.id_cita} cita={cita} />)}
-          </div>
-        </section>
-      )}
-
-      {!loading && citas.length === 0 && (
-        <EmptyState icon="📅" title="Sin citas registradas" description="Tus citas aparecerán aquí una vez que los estudiantes las agenden." />
-      )}
+      <div className={styles.list}>
+        {agendaSlice.map((cita: any) => (
+          <CitaRow key={cita.id_cita} cita={cita}
+            onAsistida={cita.estado?.toUpperCase()==='PENDIENTE' ? () => cambiarEstado({ variables: { id_cita: cita.id_cita, input: { estado: 'asistida' } } }) : undefined}
+            onCancelar={cita.estado?.toUpperCase()==='PENDIENTE' ? () => cambiarEstado({ variables: { id_cita: cita.id_cita, input: { estado: 'cancelada' } } }) : undefined}
+            onSesion={cita.estado?.toUpperCase()==='PENDIENTE' ? () => { setSelectedCita(cita); setSesionForm({ notas: '', recomendaciones: '', numero_sesion: 1 }); } : undefined}
+          />
+        ))}
+      </div>
+      <Pagination total={agendaTotal} page={agendaPage} pageSize={agendaPageSize} onChange={agendaSetPage} />
 
       <Modal open={!!selectedCita} onClose={() => setSelectedCita(null)} title="Registrar sesión clínica">
         {errorSesion && <Alert message={errorSesion.message} />}
@@ -126,7 +142,7 @@ function CitaRow({ cita, onAsistida, onCancelar, onSesion }: any) {
       </div>
       <div className={styles.citaActions}>
         <Badge label={cita.estado} variant={ESTADO_BADGE[cita.estado] ?? 'gray'} />
-        {cita.estado === 'pendiente' && onAsistida && (
+        {cita.estado?.toUpperCase() === 'PENDIENTE' && onAsistida && (
           <>
             <Button variant="primary" size="sm" onClick={onSesion}>+ Sesión</Button>
             <Button variant="secondary" size="sm" onClick={onAsistida}>Asistida</Button>

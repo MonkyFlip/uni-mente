@@ -3,12 +3,12 @@ import { useAuth } from '../auth/AuthContext';
 import { Layout } from '../components/Layout';
 import { PageHeader, StatCard } from '../components/UI';
 import {
-  Calendar, Users, Clock,
+  Calendar, Users, Clock, CheckCircle2, Hourglass,
   Search, ClipboardList, UserPlus, UserCheck, Database,
 } from 'lucide-react';
 import {
-  GET_PSICOLOGOS, GET_CITAS_ESTUDIANTE,
-  GET_AGENDA_PSICOLOGO, GET_MIS_PACIENTES,
+  GET_PSICOLOGOS, GET_MI_AGENDA, GET_MIS_CITAS,
+  GET_MIS_PACIENTES,
   GET_PSICOLOGOS_SLIM, GET_ESTUDIANTES_SLIM,
 } from '../graphql/operations';
 import styles from './Dashboard.module.css';
@@ -19,39 +19,37 @@ const TIPS = [
   'Un paso a la vez. Estamos aquí para apoyarte.',
 ];
 
-function EstudianteStats({ idEstudiante }: { idEstudiante: number }) {
+function EstudianteStats() {
   const { data: ps } = useQuery(GET_PSICOLOGOS);
-  const { data: cs } = useQuery(GET_CITAS_ESTUDIANTE, {
-    variables: { id_estudiante: idEstudiante }, skip: !idEstudiante,
-  });
-  const citas       = cs?.citasEstudiante ?? [];
+  // Use JWT-resolved query — works even if id_perfil is 0
+  const { data: cs } = useQuery(GET_MIS_CITAS, { fetchPolicy: 'cache-and-network' });
+  const citas       = cs?.misCitas ?? [];
   const pendientes  = citas.filter((c: any) => c.estado?.toUpperCase() === 'PENDIENTE').length;
   const asistidas   = citas.filter((c: any) => c.estado?.toUpperCase() === 'ASISTIDA').length;
-  const disponibles = (ps?.psicologos ?? []).length;
+  const disponibles = (ps?.psicologos ?? []).filter((p: any) => p.usuario?.activo !== false).length;
   return (
     <div className={styles.statsGrid}>
-      <StatCard icon="📅" label="Citas pendientes"       value={pendientes}  />
-      <StatCard icon="✅" label="Sesiones completadas"   value={asistidas}   />
-      <StatCard icon="👥" label="Psicólogos disponibles" value={disponibles} />
+      <StatCard icon={<Calendar size={22}/>} label="Citas pendientes" value={pendientes} />
+      <StatCard icon={<CheckCircle2 size={22}/>} label="Sesiones completadas" value={asistidas} />
+      <StatCard icon={<Users size={22}/>} label="Psicólogos disponibles" value={disponibles} />
     </div>
   );
 }
 
-function PsicologoStats({ idPsicologo }: { idPsicologo: number }) {
-  const { data: ag }  = useQuery(GET_AGENDA_PSICOLOGO, {
-    variables: { id_psicologo: idPsicologo }, skip: !idPsicologo,
-  });
+function PsicologoStats() {
+  // Use JWT-resolved query — works even if id_perfil is 0
+  const { data: ag }  = useQuery(GET_MI_AGENDA, { fetchPolicy: 'cache-and-network' });
   const { data: pac } = useQuery(GET_MIS_PACIENTES);
-  const citas      = ag?.agendaPsicologo ?? [];
-  const hoy        = new Date().toISOString().split('T')[0];
+  const citas      = ag?.miAgenda ?? [];
+  const hoy        = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD local
   const citasHoy   = citas.filter((c: any) => c.fecha === hoy && c.estado?.toUpperCase() === 'PENDIENTE').length;
   const pendientes = citas.filter((c: any) => c.estado?.toUpperCase() === 'PENDIENTE').length;
   const pacientes  = (pac?.misPacientes ?? []).length;
   return (
     <div className={styles.statsGrid}>
-      <StatCard icon="📅" label="Citas hoy"        value={citasHoy}   />
-      <StatCard icon="⏳" label="Pendientes"        value={pendientes} />
-      <StatCard icon="👥" label="Pacientes totales" value={pacientes}  />
+      <StatCard icon={<Calendar size={22}/>} label="Citas hoy" value={citasHoy} />
+      <StatCard icon={<Hourglass size={22}/>} label="Pendientes" value={pendientes} />
+      <StatCard icon={<Users size={22}/>} label="Pacientes totales" value={pacientes} />
     </div>
   );
 }
@@ -63,9 +61,9 @@ function AdminStats() {
   const ests   = (de?.estudiantes ?? []).length;
   return (
     <div className={styles.statsGrid}>
-      <StatCard icon="👥" label="Psicólogos activos"       value={psics} />
-      <StatCard icon="🎓" label="Estudiantes registrados"  value={ests}  />
-      <StatCard icon="💾" label="Respaldos disponibles"    value={3}     />
+      <StatCard icon={<UserCheck size={22}/>} label="Psicólogos activos" value={psics} />
+      <StatCard icon={<Users size={22}/>} label="Estudiantes registrados" value={ests} />
+      <StatCard icon={<Database size={22}/>} label="Respaldos disponibles" value={3} />
     </div>
   );
 }
@@ -103,7 +101,7 @@ export default function Dashboard() {
 
       {user?.rol === 'estudiante' && (
         <>
-          <EstudianteStats idEstudiante={user.id_perfil} />
+          <EstudianteStats />
           <div className={styles.quickActions}>
             <h3 className={styles.sectionTitle}>Acciones rápidas</h3>
             <div className={styles.actionsGrid}>
@@ -116,7 +114,7 @@ export default function Dashboard() {
 
       {user?.rol === 'psicologo' && (
         <>
-          <PsicologoStats idPsicologo={user.id_perfil} />
+          <PsicologoStats />
           <div className={styles.quickActions}>
             <h3 className={styles.sectionTitle}>Acciones rápidas</h3>
             <div className={styles.actionsGrid}>

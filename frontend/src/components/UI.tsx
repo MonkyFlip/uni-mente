@@ -1,3 +1,4 @@
+import React from 'react';
 import type { ReactNode } from 'react';
 import styles from './UI.module.css';
 
@@ -92,7 +93,7 @@ export function Modal({ open, onClose, title, children }: { open: boolean; onClo
 }
 
 // ─── Stat Card ───────────────────────────────────────────────────────────────
-export function StatCard({ icon, label, value, color = 'teal' }: { icon: string; label: string; value: string | number; color?: string }) {
+export function StatCard({ icon, label, value, color = 'teal' }: { icon: React.ReactNode; label: string; value: string | number; color?: string }) {
   return (
     <div className={styles.statCard}>
       <div className={styles.statIcon} style={{ color: `var(--${color})`, background: `rgba(var(--${color}-rgb, 10,181,168),0.12)` }}>{icon}</div>

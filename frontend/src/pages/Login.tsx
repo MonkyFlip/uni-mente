@@ -1,3 +1,4 @@
+import { Brain } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useMutation } from '@apollo/client';
@@ -34,7 +35,7 @@ export default function Login() {
 
       <div className={styles.left}>
         <div className={styles.heroContent}>
-          <div className={styles.logo}>🧠</div>
+          <div className={styles.logo}><Brain size={48} strokeWidth={1.2} /></div>
           <h1 className={styles.heroTitle}>UniMente</h1>
           <p className={styles.heroText}>
             Portal de bienestar psicológico universitario. Conectamos estudiantes con profesionales de salud mental.

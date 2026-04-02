@@ -16,17 +16,22 @@ const authLink = setContext((_, { headers }) => {
   };
 });
 
+// Only redirect to login on Unauthorized if we have NO valid token stored.
+// This prevents transient errors from wiping an active session.
+let redirecting = false;
 const errorLink = onError(({ graphQLErrors, networkError }) => {
   if (graphQLErrors) {
-    graphQLErrors.forEach(({ message }) => {
-      if (message === 'Unauthorized') {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+    const hasUnauthorized = graphQLErrors.some(e => e.message === 'Unauthorized');
+    if (hasUnauthorized && !redirecting) {
+      const token = localStorage.getItem('token');
+      // Only wipe session if the token is truly absent
+      if (!token) {
+        redirecting = true;
         window.location.href = '/login';
       }
-    });
+    }
   }
-  if (networkError) console.error('Network error:', networkError);
+  if (networkError) console.error('[Apollo] Network error:', networkError);
 });
 
 export const client = new ApolloClient({

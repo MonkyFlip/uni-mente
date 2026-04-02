@@ -1,3 +1,4 @@
+import { Brain } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useMutation } from '@apollo/client';
@@ -29,7 +30,7 @@ export default function Registro() {
 
       <div className={styles.left}>
         <div className={styles.heroContent}>
-          <div className={styles.logo}>🧠</div>
+          <div className={styles.logo}><Brain size={48} strokeWidth={1.2} /></div>
           <h1 className={styles.heroTitle}>UniMente</h1>
           <p className={styles.heroText}>Crea tu cuenta y accede al servicio de atención psicológica universitaria de manera confidencial y segura.</p>
         </div>

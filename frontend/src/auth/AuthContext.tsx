@@ -23,24 +23,28 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(() => {
     try {
-      // Version guard: clear stale sessions that are missing id_perfil
+      const stored  = localStorage.getItem('user');
+      const token   = localStorage.getItem('token');
       const version = localStorage.getItem('auth_version');
-      if (version !== AUTH_VERSION) {
-        localStorage.removeItem('user');
-        localStorage.removeItem('token');
-        localStorage.removeItem('id_psicologo');
-        localStorage.removeItem('id_estudiante');
-        localStorage.setItem('auth_version', AUTH_VERSION);
-        return null;
-      }
-      const stored = localStorage.getItem('user');
-      if (!stored) return null;
+
+      // Nothing stored → not logged in
+      if (!stored || !token) return null;
+
       const parsed = JSON.parse(stored) as User;
-      // Extra guard: reject if id_perfil is missing for role-specific users
-      if ((parsed.rol === 'psicologo' || parsed.rol === 'estudiante') && !parsed.id_perfil) {
-        localStorage.removeItem('user');
-        return null;
+
+      // Version guard: if the stored session is from before AUTH_VERSION
+      // and is missing required fields, force re-login
+      if (version !== AUTH_VERSION) {
+        // Accept the session only if it has all required fields
+        if (!parsed.nombre || !parsed.rol || !parsed.token) {
+          localStorage.removeItem('user');
+          localStorage.removeItem('token');
+          return null;
+        }
+        // Upgrade version tag without clearing the valid session
+        localStorage.setItem('auth_version', AUTH_VERSION);
       }
+
       return parsed;
     } catch { return null; }
   });
@@ -55,7 +59,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
-    ['token','user','id_psicologo','id_estudiante'].forEach(k => localStorage.removeItem(k));
+    ['token', 'user', 'id_psicologo', 'id_estudiante', 'auth_version']
+      .forEach(k => localStorage.removeItem(k));
     setUser(null);
   };
 

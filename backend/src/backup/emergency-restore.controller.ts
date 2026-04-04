@@ -13,13 +13,13 @@
  */
 
 import {
-  Controller, Post, Body, Headers, HttpException, HttpStatus, Logger, Req,
+  Controller, Get, Post, Body, Headers, HttpException, HttpStatus, Logger, Req,
 } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { resolve, join, sep } from 'path';
-import { existsSync, readdirSync, readFileSync } from 'fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'fs';
 import { timingSafeEqual } from 'crypto';
 import { Request } from 'express';
 import { BackupService } from './backup.service';
@@ -48,6 +48,46 @@ export class EmergencyRestoreController {
     private readonly configService: ConfigService,
     private readonly backupService: BackupService,
   ) {}
+
+  /**
+   * GET /api/emergency-backups
+   * Lista los archivos de respaldo disponibles en backend/Backup/.
+   * No requiere autenticación (la BD está vacía en este contexto).
+   */
+  @Get('emergency-backups')
+  listEmergencyBackups() {
+    const backups: any[] = [];
+
+    // Backups en sistema de archivos
+    if (existsSync(BACKUP_DIR)) {
+      const archivos = readdirSync(BACKUP_DIR)
+        .filter(f => f.endsWith('.sql') || f.endsWith('.json') || f.endsWith('.csv') || f.endsWith('.xlsx'))
+        .sort()
+        .reverse(); // más recientes primero
+
+      for (const archivo of archivos) {
+        try {
+          const fullPath = join(BACKUP_DIR, archivo);
+          const stat     = statSync(fullPath);
+          // Parse metadata from filename: backup_TIPO_FORMATO_TIMESTAMP.ext
+          const parts    = archivo.split('_');
+          const tipo     = parts[1]?.toUpperCase() ?? 'COMPLETO';
+          const formato  = parts[2]?.toUpperCase() ?? archivo.split('.').pop()?.toUpperCase() ?? 'SQL';
+          backups.push({
+            id_backup:       null,
+            nombre_archivo:  archivo,
+            tipo,
+            formato,
+            tamanio_kb:     Math.round(stat.size / 1024) || 1,
+            modo:           'MANUAL',
+            created_at:     stat.mtime.toISOString(),
+          });
+        } catch { /* ignorar archivos no legibles */ }
+      }
+    }
+
+    return { backups };
+  }
 
   @Post('emergency-restore')
   async emergencyRestore(
@@ -86,7 +126,7 @@ export class EmergencyRestoreController {
         for (const batch of batches) await this.dataSource.query(batch).catch(() => {});
       }
     } catch (e) {
-      this.logger.warn(`[EmergencyRestore] init.sql: ${e.message}`);
+      this.logger.warn(`[EmergencyRestore] init.sql: ${(e as Error).message}`);
     }
 
     // 4. Restaurar por ID

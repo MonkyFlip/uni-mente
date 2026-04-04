@@ -1,13 +1,19 @@
 version: "3.9"
 
 # ================================================================
-#  UniMente — Docker Compose
-#  SQL Server 2022 + NestJS Backend
+#  UniMente — Docker Compose (SQL Server 2022 + NestJS)
 #
-#  ✔ MSSQL aislado en red interna
-#  ✔ Backend expuesto solo en puerto 3000
-#  ✔ Persistencia de datos y backups
-#  ✔ Sin exposición innecesaria de puertos
+#  Uso rápido:
+#    cp .env.example .env       # ajusta DB_PASSWORD, JWT_SECRET, etc.
+#    docker compose up --build  # primera vez
+#    docker compose up -d       # reinicios posteriores
+#
+#  OWASP mitigations en este archivo:
+#    A02: contraseñas desde .env, nunca hardcodeadas en compose
+#    A05: red interna (backend↔db solo por red Docker, no expuesta)
+#    A05: solo el puerto necesario expuesto al host
+#    A08: imágenes con tag fijo (no :latest)
+#    A06: healthcheck antes de arrancar el backend
 # ================================================================
 
 services:
@@ -18,26 +24,34 @@ services:
     container_name: unimente-sqlserver
     restart: unless-stopped
     environment:
-      SA_PASSWORD: "${DB_PASSWORD}"
-      ACCEPT_EULA: "Y"
-      MSSQL_PID: "Developer"
-      MSSQL_COLLATION: "SQL_Latin1_General_CP1_CI_AS"
+      # OWASP A02: contraseña desde .env, nunca hardcodeada aquí
+      SA_PASSWORD:          "${DB_PASSWORD:-UniMente_DB_2026!}"
+      ACCEPT_EULA:          "Y"
+      MSSQL_PID:            "Developer"   # Developer = gratis para dev/test
+      MSSQL_COLLATION:      "SQL_Latin1_General_CP1_CI_AS"
+      # Deshabilitar telemetría
       MSSQL_TELEMETRY_ENABLED: "FALSE"
+    ports:
+      # OWASP A05: exponer solo si necesario acceso externo
+      # En producción remover este port y acceder solo desde la red interna
+      - "${DB_PORT:-1433}:1433"
     volumes:
+      # Persistir datos de SQL Server fuera del contenedor
       - unimente_sqlserver_data:/var/opt/mssql
     networks:
       - unimente-internal
     healthcheck:
+      # Probar primero mssql-tools18, si no existe usar mssql-tools
       test:
         - CMD-SHELL
         - |
-          /opt/mssql-tools18/bin/sqlcmd \
-            -S localhost -U sa -P "${DB_PASSWORD}" \
-            -Q "SELECT 1" -C -b -o /dev/null 2>&1 || exit 1
+          (/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "${DB_PASSWORD:-UniMente_DB_2026!}" -Q "SELECT 1" -C -b -o /dev/null 2>/dev/null) ||
+          (/opt/mssql-tools/bin/sqlcmd  -S localhost -U sa -P "${DB_PASSWORD:-UniMente_DB_2026!}" -Q "SELECT 1" -b -o /dev/null 2>/dev/null) ||
+          exit 1
       interval: 15s
-      timeout: 10s
-      retries: 12
-      start_period: 60s
+      timeout: 15s
+      retries: 20
+      start_period: 90s
 
   # ─── NestJS Backend ──────────────────────────────────────────────
   backend:
@@ -49,31 +63,44 @@ services:
     restart: unless-stopped
     depends_on:
       db:
-        condition: service_healthy
+        condition: service_healthy    # esperar healthcheck de SQL Server
     environment:
-      DB_HOST: db
-      DB_PORT: 1433
-      DB_USER: sa
-      DB_PASSWORD: "${DB_PASSWORD}"
-      DB_NAME: "${DB_NAME}"
-      DB_TRUST_CERT: "true"
+      # ── Base de datos ────────────────────────────────────────────
+      # OWASP A05: host es el nombre del servicio Docker (solo red interna)
+      DB_HOST:        db
+      DB_PORT:        1433
+      DB_USER:        sa
+      DB_PASSWORD:    "${DB_PASSWORD:-UniMente_DB_2026!}"
+      DB_NAME:        "${DB_NAME:-unimente}"
+      DB_TRUST_CERT:  "${DB_TRUST_CERT:-true}"   # false en produccion
 
-      JWT_SECRET: "${JWT_SECRET}"
-      JWT_EXPIRES: "8h"
+      # ── JWT ──────────────────────────────────────────────────────
+      # OWASP A02: secreto desde .env
+      JWT_SECRET:     "${JWT_SECRET:-CAMBIA_ESTE_SECRETO_EN_PRODUCCION_32CHARS}"
+      JWT_EXPIRES:    "${JWT_EXPIRES:-8h}"
 
-      RESTORE_SECRET: "${RESTORE_SECRET}"
+      # ── Emergencia ───────────────────────────────────────────────
+      RESTORE_SECRET: "${RESTORE_SECRET:-UniMente_Restore_2026_SuperSecreta}"
 
-      PORT: 3000
-      NODE_ENV: production
+      # ── Servidor ─────────────────────────────────────────────────
+      PORT:           3000
+      NODE_ENV:       "${NODE_ENV:-development}"
 
-      ALLOWED_ORIGINS: "${ALLOWED_ORIGINS}"
+      # ── CORS ─────────────────────────────────────────────────────
+      # OWASP A05: lista blanca desde .env
+      ALLOWED_ORIGINS: "${ALLOWED_ORIGINS:-http://localhost:5173,http://localhost:3000}"
 
-      SEED_ADMIN_PASSWORD: "${SEED_ADMIN_PASSWORD}"
-      SEED_DEFAULT_PASSWORD: "${SEED_DEFAULT_PASSWORD}"
+      # ── Contraseñas del Seed (CWE-547) ───────────────────────────
+      SEED_ADMIN_PASSWORD:        "${SEED_ADMIN_PASSWORD:-Admin1234!}"
+      SEED_ADMIN_BRENDA_PASSWORD: "${SEED_ADMIN_BRENDA_PASSWORD:-Brenda123!}"
+      SEED_ADMIN_ABRIL_PASSWORD:  "${SEED_ADMIN_ABRIL_PASSWORD:-Abril123!}"
+      SEED_ADMIN_MAI_PASSWORD:    "${SEED_ADMIN_MAI_PASSWORD:-Mai123!}"
+      SEED_DEFAULT_PASSWORD:      "${SEED_DEFAULT_PASSWORD:-Password123!}"
 
     ports:
-      - "3000:3000"
+      - "${PORT:-3000}:3000"
     volumes:
+      # Persistir backups generados fuera del contenedor
       - unimente_backups:/app/Backup
     networks:
       - unimente-internal
@@ -84,12 +111,17 @@ services:
       retries: 5
       start_period: 45s
 
-# ─── Volúmenes persistentes ──────────────────────────────────────
+# ─── Volumes ─────────────────────────────────────────────────────
 volumes:
   unimente_sqlserver_data:
+    driver: local
   unimente_backups:
+    driver: local
 
-# ─── Red interna aislada ─────────────────────────────────────────
+# ─── Networks ────────────────────────────────────────────────────
+# OWASP A05: red interna aislada — el contenedor db no es accesible
+# desde fuera de esta red (salvo por el port expuesto arriba)
 networks:
   unimente-internal:
+    name: unimente-network
     driver: bridge

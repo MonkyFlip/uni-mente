@@ -1,19 +1,15 @@
 # ================================================================
-#  UniMente — Docker Compose (SQL Server 2022 + NestJS)
+#  UniMente — Docker Compose (SQL Server 2022 + NestJS + Nginx SSL)
 #  Instancia: AWS EC2 c7i-flex.large (2 vCPU / 4 GB RAM)
 #
 #  Primera vez en EC2:
-#    cp .env.example .env   # editar con valores reales
+#    cp .env.example .env        # editar con valores reales
+#    ./nginx/gen-cert.sh         # generar certificado SSL (una sola vez)
 #    docker compose up --build -d
 #
-#  El servicio systemd "unimente" arranca esto automaticamente
-#  en cada encendido de la EC2 (ver AWS.md).
-#
-#  OWASP mitigations:
-#    A02: secretos desde .env
-#    A05: red interna aislada, puerto 1433 NO expuesto publicamente
-#    A06: imagenes con tag fijo
-#    A08: healthcheck garantiza orden secuencial
+#  Reinicios / actualizaciones:
+#    docker compose up -d        # sin --build si no hubo cambios de código
+#    docker compose up --build -d backend  # solo rebuild del backend
 # ================================================================
 
 services:
@@ -30,15 +26,12 @@ services:
       MSSQL_PID:               "Developer"
       MSSQL_COLLATION:         "SQL_Latin1_General_CP1_CI_AS"
       MSSQL_TELEMETRY_ENABLED: "FALSE"
-      # c7i-flex.large (4 GB): SQL Server usa hasta 2.4 GB
       MSSQL_MEMORY_LIMIT_MB:   "2400"
 
-    # SEGURIDAD: puerto 1433 NO expuesto al exterior.
-    # Solo accesible desde el contenedor backend dentro de la red interna.
-    # Si necesitas acceso con SSMS desde tu maquina, agrega temporalmente:
-    #   ports:
-    #     - "1433:1433"
-    # Y abre el puerto 1433 en el Security Group de AWS.
+    # Puerto 1433 NO expuesto al exterior — solo red interna Docker.
+    # Descomenta si necesitas acceso externo con SSMS (y abre el SG de AWS).
+    # ports:
+    #   - "1433:1433"
 
     volumes:
       - unimente_sqlserver_data:/var/opt/mssql
@@ -46,11 +39,11 @@ services:
     networks:
       - unimente-internal
 
-    # c7i-flex.large: 2.8 GB para SQL Server
     mem_limit: 2800m
     mem_reservation: 2400m
 
     healthcheck:
+      # Prueba mssql-tools18 (imagen 2022+) con fallback a legacy.
       test:
         - CMD-SHELL
         - >
@@ -60,7 +53,7 @@ services:
           (/opt/mssql-tools/bin/sqlcmd -S localhost -U sa
           -P "${DB_PASSWORD:-UniMente_DB_2026!}" -Q "SELECT 1" -b -o /dev/null 2>/dev/null)
           || exit 1
-      start_period: 90s
+      start_period: 90s   # SQL Server tarda ~30-60 s en iniciar
       interval:     15s
       timeout:      15s
       retries:      20
@@ -74,6 +67,7 @@ services:
     container_name: unimente-backend
     restart: unless-stopped
 
+    # Solo arranca cuando SQL Server pasa el healthcheck
     depends_on:
       db:
         condition: service_healthy
@@ -94,17 +88,17 @@ services:
       PORT:     3000
       NODE_ENV: "${NODE_ENV:-production}"
 
-      # Frontend en Amplify + desarrollo local
-      ALLOWED_ORIGINS: "${ALLOWED_ORIGINS:-https://aws.d1mrcwf1ifucba.amplifyapp.com,http://localhost:5173,http://localhost:3000}"
+      ALLOWED_ORIGINS: "${ALLOWED_ORIGINS:-https://aws.d1mrcwf1ifucba.amplifyapp.com,http://localhost:5173}"
 
       SEED_ADMIN_PASSWORD:        "${SEED_ADMIN_PASSWORD:-Admin1234!}"
-      SEED_ADMIN_BRENDA_PASSWORD: "${SEED_ADMIN_BRENDA_PASSWORD:-Brenda123!}"
-      SEED_ADMIN_ABRIL_PASSWORD:  "${SEED_ADMIN_ABRIL_PASSWORD:-Abril123!}"
-      SEED_ADMIN_MAI_PASSWORD:    "${SEED_ADMIN_MAI_PASSWORD:-Mai1234!}"
+      SEED_ADMIN_BRENDA_PASSWORD: "${SEED_ADMIN_BRENDA_PASSWORD:-Brenda1234!}"
+      SEED_ADMIN_ABRIL_PASSWORD:  "${SEED_ADMIN_ABRIL_PASSWORD:-Abril1234!}"
+      SEED_ADMIN_MAI_PASSWORD:    "${SEED_ADMIN_MAI_PASSWORD:-Mai1234!!}"
       SEED_DEFAULT_PASSWORD:      "${SEED_DEFAULT_PASSWORD:-Password123!}"
 
+    # Puerto 3000 expuesto para desarrollo local.
+    # En producción el tráfico llega via nginx (puerto 443).
     ports:
-      # Puerto 3000 accesible desde internet (frontend Amplify → EC2)
       - "${PORT:-3000}:3000"
 
     volumes:
@@ -113,16 +107,43 @@ services:
     networks:
       - unimente-internal
 
-    # c7i-flex.large: NestJS con margen holgado
     mem_limit: 768m
     mem_reservation: 512m
 
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/graphql || exit 1"]
-      start_period: 60s
-      interval:     30s
+      # Verifica que el puerto 3000 acepte conexiones TCP.
+      # Más fiable que hacer una petición HTTP (que puede fallar por timeout de Apollo).
+      # nc (netcat) disponible en Alpine via busybox — verifica que el puerto TCP este abierto
+      test: ["CMD-SHELL", "nc -z localhost 3000 || exit 1"]
+      start_period: 180s  # El backend tarda ~2-3 min en EC2 (init BD + seed check)
+      interval:     20s
       timeout:      10s
-      retries:      5
+      retries:      10
+
+  # ─── Nginx SSL Proxy ─────────────────────────────────────────────
+  # Termina TLS para que Amplify (HTTPS) pueda conectar al backend.
+  # Prerequisito: ejecutar ./nginx/gen-cert.sh una vez antes del primer arranque.
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: unimente-nginx
+    restart: unless-stopped
+
+    # Arranca en cuanto el proceso del backend inicia,
+    # sin esperar el healthcheck (nginx reintentará hasta que el backend responda).
+    depends_on:
+      backend:
+        condition: service_started
+
+    ports:
+      - "80:80"
+      - "443:443"
+
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+
+    networks:
+      - unimente-internal
 
 # ─── Volumes ─────────────────────────────────────────────────────
 volumes:

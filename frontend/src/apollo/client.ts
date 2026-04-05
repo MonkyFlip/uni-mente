@@ -2,8 +2,8 @@ import { ApolloClient, InMemoryCache, createHttpLink, from } from '@apollo/clien
 import { setContext } from '@apollo/client/link/context';
 import { onError } from '@apollo/client/link/error';
 
-export const GRAPHQL_URL  = 'https://18.190.217.141/graphql';
-export const API_BASE_URL = 'https://18.190.217.141';
+export const GRAPHQL_URL  = 'https://unimente.duckdns.org/graphql';
+export const API_BASE_URL = 'https://unimente.duckdns.org';
 
 const httpLink = createHttpLink({
   uri: GRAPHQL_URL,

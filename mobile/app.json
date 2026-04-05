@@ -48,8 +48,8 @@
       ]
     ],
     "extra": {
-      "API_URL":      "https://uni-mente-production.up.railway.app/graphql",
-      "API_REST_URL": "https://uni-mente-production.up.railway.app",
+        "API_URL":      "https://unimente.duckdns.org/graphql",
+        "API_REST_URL": "https://unimente.duckdns.org",
       "eas": {
         "projectId": ""
       }

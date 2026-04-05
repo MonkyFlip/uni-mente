@@ -19,14 +19,15 @@ Portal de Bienestar Universitario — Sistema integral de gestión de atención 
 |---|---|
 | [BACKEND.md](./backend/BACKEND.md) | API GraphQL, base de datos, seed, backups, MFA, endpoints REST |
 | [AWS.md](./backend/AWS.md) | Despliegue, operación, troubleshooting y actualización en EC2 |
+| [AWS_DUCKDNS.md](./backend/AWS_DUCKDNS.md) | Configuración del dominio gratuito DuckDNS + SSL Let's Encrypt |
 | [FRONTEND.md](./frontend/FRONTEND.md) | Componentes, rutas, tour interactivo, Amplify |
-| [MOBILE.md](./mobile/MOBILE.md) | Expo, APK, pantallas |
+| [MOBILE.md](./mobile/MOBILE.md) | Expo, EAS Build, AAB para Google Play |
 
 ---
 
 ## Descripción
 
-UniMente cubre el ciclo completo de atención psicológica universitaria: agendamiento de citas con calendario personalizado, registro de sesiones clínicas, historial del paciente, autenticación de dos factores (MFA/TOTP), sistema de respaldos de base de datos en múltiples formatos, descarga de respaldos y protocolo de restauración de emergencia.
+UniMente cubre el ciclo completo de atención psicológica universitaria: agendamiento de citas con calendario personalizado, registro de sesiones clínicas, historial del paciente, autenticación de dos factores (MFA/TOTP), sistema de respaldos en múltiples formatos con descarga directa y protocolo de restauración de emergencia.
 
 ---
 
@@ -40,7 +41,8 @@ UniMente cubre el ciclo completo de atención psicológica universitaria: agenda
 | Comunicación | GraphQL |
 | MFA | speakeasy (TOTP RFC 6238) + qrcode |
 | Backups | ExcelJS + mssql nativo |
-| Proxy / SSL | nginx 1.27 (SSL termination + CORS handler) |
+| Proxy / SSL | nginx 1.27 + Let's Encrypt (SSL real) |
+| DNS dinámico | DuckDNS (gratuito, auto-actualización) |
 | App móvil | React Native 0.81 + Expo SDK 54 + Expo Router + Apollo Client |
 | Contenedores | Docker + Docker Compose |
 | Frontend cloud | AWS Amplify |
@@ -58,8 +60,9 @@ uni-mente/
 │   ├── Dockerfile
 │   ├── docker-compose.yml
 │   ├── .env.example
-│   ├── AWS.md                # Guía completa de despliegue en EC2
-│   └── BACKEND.md            # Documentación técnica
+│   ├── AWS.md                # Guía completa de despliegue y operación en EC2
+│   ├── AWS_DUCKDNS.md        # Dominio gratuito DuckDNS + SSL Let's Encrypt
+│   └── BACKEND.md            # Documentación técnica de la API
 ├── frontend/                 # App web React + Vite
 ├── mobile/                   # App móvil React Native + Expo
 └── README.md                 # Este archivo
@@ -90,23 +93,13 @@ Rama conectada: `aws` — se redespliega automáticamente con cada push.
 | Instancia | c7i-flex.large (2 vCPU / 4 GB RAM) |
 | SO | Amazon Linux 2023 |
 | Almacenamiento | 30 GiB gp3 |
-| Puerto público | 443 (HTTPS vía nginx) |
+| **Dominio** | **unimente.duckdns.org** |
+| Puerto público | 443 (HTTPS con certificado Let's Encrypt) |
 | Base de datos | SQL Server 2022 (Docker, red interna) |
 
-> **⚠️ IP dinámica — verificar antes de usar**
+> **La IP de la EC2 ya no importa.** El dominio `unimente.duckdns.org` se actualiza automáticamente cada vez que la instancia se enciende gracias al script DuckDNS configurado en el cron. No hay que tocar ningún archivo del código.
 >
-> La EC2 tiene IP pública dinámica. **Cada vez que la instancia se apaga y vuelve a encender, la IP cambia.**
->
-> **Pasos tras encender la EC2:**
-> 1. Consola AWS → EC2 → Instancias → seleccionar `UniMente`
-> 2. Copiar la nueva **Dirección IPv4 pública**
-> 3. Actualizar `frontend/src/apollo/client.ts`:
->    ```typescript
->    uri: 'https://<NUEVA_IP>/graphql'
->    ```
-> 4. `git push origin aws` → Amplify redespliega en ~2 min
->
-> **Solución permanente:** asignar una **Elastic IP** en la consola AWS (gratis mientras la instancia está encendida).
+> Ver [AWS_DUCKDNS.md](./backend/AWS_DUCKDNS.md) para detalles de la configuración.
 
 ---
 
@@ -122,8 +115,6 @@ cp .env.example .env
 docker compose up --build -d
 # API en http://localhost:3000/graphql
 ```
-
-SQL Server y NestJS se levantan en orden automáticamente. El seed corre al primer arranque.
 
 ### Frontend
 
@@ -160,7 +151,7 @@ Amplify detecta el push y redespliega el frontend automáticamente.
 ### Actualizar la EC2
 
 ```bash
-ssh -i unimente-key.pem ec2-user@<IP_PUBLICA>
+ssh -i unimente-key.pem ec2-user@unimente.duckdns.org
 cd ~/unimente-backend
 git stash
 git pull origin aws
@@ -183,7 +174,7 @@ Según qué cambió:
 
 ## Credenciales de prueba
 
-Las contraseñas se configuran en `.env` antes del primer arranque.
+Las contraseñas se configuran en `.env` antes del primer arranque (mínimo 8 caracteres).
 
 | Rol | Correo | Variable |
 |---|---|---|
@@ -194,66 +185,48 @@ Las contraseñas se configuran en `.env` antes del primer arranque.
 | Psicólogos | psicologo1..12@unimente.edu | `SEED_DEFAULT_PASSWORD` |
 | Estudiantes | estudiante1..100@unimente.edu | `SEED_DEFAULT_PASSWORD` |
 
-> Todas las contraseñas deben tener **mínimo 8 caracteres** (requerido por el seed en producción).
-
 ---
 
 ## Funcionalidades principales
 
-### Por rol
-
 | Rol | Funcionalidades |
 |---|---|
-| **Administrador** | Gestionar psicólogos y estudiantes (activar/desactivar), registrar psicólogos, crear/restaurar/descargar backups, configurar backup automático, seguridad MFA |
-| **Psicólogo** | Gestionar horarios de atención, ver y gestionar agenda, registrar sesiones clínicas, ver expediente completo de pacientes |
-| **Estudiante** | Buscar psicólogos disponibles, agendar citas con calendario personalizado, ver y cancelar citas, ver historial |
-
-### Calendario de citas
-
-El calendario solo muestra días válidos según el horario del psicólogo seleccionado. Los días con citas existentes se marcan en rojo — imposible agendar en fecha incorrecta.
-
-### MFA
-
-TOTP compatible con Google Authenticator, Microsoft Authenticator y Authy. Requerido para operaciones críticas: crear backups, restaurar backups, cambiar contraseña.
-
-### Respaldos
-
-- **Tipos:** COMPLETO, DIFERENCIAL, INCREMENTAL
-- **Formatos:** SQL, JSON, EXCEL, CSV
-- **Scheduler:** automático con frecuencia configurable (1h a 720h)
-- **Límite:** máximo 3 respaldos — el más antiguo se elimina automáticamente
-- **Descarga:** botón de descarga directa en la interfaz de administrador
-- **Emergencia:** restauración sin JWT cuando la BD está vacía
+| **Administrador** | Gestionar psicólogos y estudiantes, registrar psicólogos, crear/restaurar/descargar backups, configurar backup automático, seguridad MFA |
+| **Psicólogo** | Gestionar horarios, ver agenda, registrar sesiones clínicas, ver expediente de pacientes, exportar historial a PDF |
+| **Estudiante** | Buscar psicólogos, agendar citas con calendario personalizado, ver y cancelar citas |
 
 ---
 
 ## Arquitectura en producción
 
 ```
-Amplify (HTTPS)          Expo Go / APK
-       │                      │
-       └──────┬───────────────┘
-              │  HTTPS :443
-              ▼
-     EC2 c7i-flex.large
-     ┌─────────────────────────────┐
-     │  nginx (SSL termination)    │
-     │  CORS handler               │
-     │  Reverse proxy              │
-     └──────────┬──────────────────┘
-                │ HTTP interno
-                ▼
-     ┌─────────────────────────────┐
-     │  NestJS + Apollo GraphQL    │
-     │  Puerto 3000 (interno)      │
-     └──────────┬──────────────────┘
-                │ mssql driver
-                ▼
-     ┌─────────────────────────────┐
-     │  SQL Server 2022            │
-     │  Puerto 1433 (interno)      │
-     │  Volumen EBS persistente    │
-     └─────────────────────────────┘
+Amplify (HTTPS)          Expo Go / APK / AAB
+       │                        │
+       └──────────┬─────────────┘
+                  │  HTTPS :443
+                  ▼
+     unimente.duckdns.org
+     ┌─────────────────────────────────┐
+     │  EC2 c7i-flex.large             │
+     │  ┌───────────────────────────┐  │
+     │  │  nginx (SSL Let's Encrypt)│  │
+     │  │  CORS handler             │  │
+     │  └──────────┬────────────────┘  │
+     │             │ HTTP interno       │
+     │  ┌──────────▼────────────────┐  │
+     │  │  NestJS + Apollo GraphQL  │  │
+     │  │  Puerto 3000 (interno)    │  │
+     │  └──────────┬────────────────┘  │
+     │             │ mssql driver       │
+     │  ┌──────────▼────────────────┐  │
+     │  │  SQL Server 2022          │  │
+     │  │  Puerto 1433 (interno)    │  │
+     │  │  Volumen EBS persistente  │  │
+     │  └───────────────────────────┘  │
+     └─────────────────────────────────┘
+
+     DuckDNS actualiza unimente.duckdns.org
+     automáticamente cada 5 min si la IP cambia
 ```
 
 ---
@@ -262,25 +235,20 @@ Amplify (HTTPS)          Expo Go / APK
 
 | OWASP | Mitigación |
 |---|---|
-| A01 Broken Access Control | Guards por rol (`@Roles`) en cada resolver y controller |
-| A01 | Soft delete vía columna `activo BIT` — datos clínicos nunca se borran |
-| A02 Cryptographic Failures | bcrypt para contraseñas, JWT firmado con secreto de 96+ chars, TLS en SQL Server |
-| A03 Injection | TypeORM con queries parametrizadas, sin SQL raw expuesto al usuario |
-| A05 Security Misconfiguration | `synchronize: false`, usuario no-root en Docker, puertos 1433 y 3000 no expuestos al exterior |
-| A07 Auth Failures | Rate limiting global con `@nestjs/throttler`, MFA TOTP para operaciones críticas |
-| A08 Software Integrity | Multi-stage Docker build, `npm ci` con lockfile, imágenes con tag fijo |
-| A09 Logging | Todos los intentos no autorizados registrados con IP (backups, emergency restore, path traversal) |
-| CWE-23 | Path traversal en descarga y restauración de backups: allowlist + `resolve()` + `startsWith()` |
+| A01 Broken Access Control | Guards por rol en cada resolver y controller |
+| A01 | Soft delete vía `activo BIT` — datos clínicos nunca se borran |
+| A02 Cryptographic Failures | bcrypt, JWT 96+ chars, TLS con Let's Encrypt |
+| A03 Injection | TypeORM parametrizado, sin SQL raw expuesto |
+| A05 Security Misconfiguration | `synchronize: false`, usuario no-root en Docker, puertos 1433 y 3000 no expuestos |
+| A07 Auth Failures | Rate limiting global, MFA TOTP para operaciones críticas |
+| A08 Software Integrity | Multi-stage Docker build, `npm ci` con lockfile |
+| A09 Logging | Intentos no autorizados registrados con IP |
+| CWE-23 | Path traversal prevenido en descarga y restauración de backups |
 
 ---
 
-## App móvil — APK
+## App móvil — Google Play
 
-```powershell
-cd mobile
-npm run build:android
-```
+La app se publica en Google Play usando **EAS Build** de Expo para generar el **AAB** (Android App Bundle).
 
-El APK queda en `android\app\build\outputs\apk\release\unimente-release.apk`
-
-Ver [MOBILE.md](./mobile/MOBILE.md#5-generar-apk) para instrucciones completas.
+Ver [MOBILE.md](./mobile/MOBILE.md) para el proceso completo.

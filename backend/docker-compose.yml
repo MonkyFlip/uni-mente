@@ -140,7 +140,10 @@ services:
 
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/certs:/etc/nginx/certs:ro
+      # Certificados Let's Encrypt (generados con certbot en el host)
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      # Webroot para renovacion automatica de Let's Encrypt
+      - /var/www/certbot:/var/www/certbot:ro
 
     networks:
       - unimente-internal

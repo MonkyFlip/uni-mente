@@ -8,6 +8,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { GET_PSICOLOGOS, CREAR_HORARIO, ELIMINAR_HORARIO } from '../../graphql/operations';
 import { PageHeader, Button, Modal, Field, Input, Alert, EmptyState, Card } from '../../components/UI';
 import { Colors } from '../../constants/colors';
+import { MenuButton } from '../../components/Drawer';
 
 const DIAS = ['lunes','martes','miercoles','jueves','viernes','sabado','domingo'];
 const DIAS_ES: Record<string, string> = {
@@ -59,6 +60,7 @@ export default function Horarios() {
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.headerRow}>
+          <MenuButton />
           <PageHeader title="Mis Horarios" />
           <Button
             size="sm"

@@ -1,8 +1,14 @@
+/**
+ * app/index.tsx — Entry point con loading guard
+ *
+ * El error "useAuth must be inside AuthProvider" ocurre porque
+ * index.tsx se monta antes que los providers estén listos.
+ * El loading guard evita el render prematuro.
+ */
 import { useEffect } from 'react';
 import { View, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext';
-import { Colors } from '../constants/colors';
 
 export default function Index() {
   const { user, loading } = useAuth();
@@ -19,9 +25,11 @@ export default function Index() {
     }
   }, [user, loading]);
 
+  // Mientras carga AsyncStorage no renderiza nada
   return (
-    <View style={{ flex: 1, backgroundColor: Colors.navy, alignItems: 'center', justifyContent: 'center' }}>
-      <ActivityIndicator size="large" color={Colors.teal} />
+    <View style={{ flex: 1, backgroundColor: '#0d1117',
+      alignItems: 'center', justifyContent: 'center' }}>
+      {loading && <ActivityIndicator color="#1A7A6E" size="large" />}
     </View>
   );
 }

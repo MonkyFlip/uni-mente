@@ -17,13 +17,33 @@ export const REGISTRAR_ESTUDIANTE = gql`
   }
 `;
 
-// ── Psicólogos ────────────────────────────────────────────────────
+// ── Psicólogos (lista pública para estudiantes) ───────────────────
 export const GET_PSICOLOGOS = gql`
   query GetPsicologos {
     psicologos {
       id_psicologo especialidad cedula telefono
       usuario { id_usuario nombre correo }
       horarios { id_horario dia_semana hora_inicio hora_fin disponible }
+    }
+  }
+`;
+
+// ── Admin — incluye activo ────────────────────────────────────────
+export const GET_PSICOLOGOS_ADMIN = gql`
+  query GetPsicologosAdmin {
+    psicologosAdmin {
+      id_psicologo especialidad cedula telefono
+      usuario { id_usuario nombre correo activo }
+      horarios { id_horario dia_semana hora_inicio hora_fin disponible }
+    }
+  }
+`;
+
+export const GET_ESTUDIANTES_ADMIN = gql`
+  query GetEstudiantesAdmin {
+    estudiantesAdmin {
+      id_estudiante matricula carrera
+      usuario { id_usuario nombre correo activo }
     }
   }
 `;
@@ -52,6 +72,18 @@ export const ACTUALIZAR_PSICOLOGO = gql`
   }
 `;
 
+export const TOGGLE_ACTIVO_PSICOLOGO = gql`
+  mutation ToggleActivoPsicologo($id: Int!) {
+    toggleActivoPsicologo(id: $id) { id_psicologo usuario { activo } }
+  }
+`;
+
+export const TOGGLE_ACTIVO_ESTUDIANTE = gql`
+  mutation ToggleActivoEstudiante($id: Int!) {
+    toggleActivoEstudiante(id: $id) { id_estudiante usuario { activo } }
+  }
+`;
+
 // ── Horarios ──────────────────────────────────────────────────────
 export const CREAR_HORARIO = gql`
   mutation CrearHorario($input: CreateHorarioInput!) {
@@ -73,18 +105,26 @@ export const AGENDAR_CITA = gql`
   }
 `;
 
-export const GET_CITAS_ESTUDIANTE = gql`
-  query CitasEstudiante($id_estudiante: Int!) {
-    citasEstudiante(id_estudiante: $id_estudiante) {
+/**
+ * JWT-resolved — el backend extrae id_estudiante del token.
+ * NO necesita pasar id_estudiante como parámetro.
+ */
+export const GET_MIS_CITAS = gql`
+  query MisCitas {
+    misCitas {
       id_cita fecha hora_inicio hora_fin estado motivo
       psicologo { id_psicologo especialidad usuario { nombre } }
     }
   }
 `;
 
-export const GET_AGENDA_PSICOLOGO = gql`
-  query AgendaPsicologo($id_psicologo: Int!) {
-    agendaPsicologo(id_psicologo: $id_psicologo) {
+/**
+ * JWT-resolved — el backend extrae id_psicologo del token.
+ * NO necesita pasar id_psicologo como parámetro.
+ */
+export const GET_MI_AGENDA = gql`
+  query MiAgenda {
+    miAgenda {
       id_cita fecha hora_inicio hora_fin estado motivo
       estudiante { id_estudiante matricula carrera usuario { nombre correo } }
       sesion { id_sesion }
@@ -94,9 +134,7 @@ export const GET_AGENDA_PSICOLOGO = gql`
 
 export const CAMBIAR_ESTADO_CITA = gql`
   mutation CambiarEstadoCita($id_cita: Int!, $input: UpdateEstadoCitaInput!) {
-    cambiarEstadoCita(id_cita: $id_cita, input: $input) {
-      id_cita estado
-    }
+    cambiarEstadoCita(id_cita: $id_cita, input: $input) { id_cita estado }
   }
 `;
 
@@ -104,6 +142,20 @@ export const REGISTRAR_SESION = gql`
   mutation RegistrarSesion($input: CreateSesionInput!) {
     registrarSesion(input: $input) {
       id_sesion numero_sesion notas recomendaciones fecha_registro
+    }
+  }
+`;
+
+// ── Historial ─────────────────────────────────────────────────────
+export const GET_MIS_PACIENTES = gql`
+  query MisPacientes {
+    misPacientes {
+      id_estudiante matricula carrera
+      usuario { nombre correo }
+      citas {
+        id_cita fecha hora_inicio estado
+        sesion { id_sesion numero_sesion notas recomendaciones fecha_registro }
+      }
     }
   }
 `;
@@ -132,25 +184,19 @@ export const CAMBIAR_PASSWORD = gql`
 // ── Backup ────────────────────────────────────────────────────────
 export const GET_BACKUPS = gql`
   query ListarBackups {
-    listarBackups {
-      id_backup tipo formato nombre_archivo tamanio_kb modo created_at
-    }
+    listarBackups { id_backup tipo formato nombre_archivo tamanio_kb modo created_at }
   }
 `;
 
 export const GET_BACKUP_CONFIG = gql`
   query ConfigBackupAutomatico {
-    configBackupAutomatico {
-      id tipo formato frecuencia_horas activo ultima_ejecucion
-    }
+    configBackupAutomatico { id tipo formato frecuencia_horas activo ultima_ejecucion }
   }
 `;
 
 export const CREAR_BACKUP = gql`
   mutation CrearBackup($input: CreateBackupInput!) {
-    crearBackup(input: $input) {
-      id_backup tipo formato nombre_archivo tamanio_kb modo created_at
-    }
+    crearBackup(input: $input) { id_backup tipo formato nombre_archivo tamanio_kb modo created_at }
   }
 `;
 
@@ -160,8 +206,6 @@ export const RESTAURAR_BACKUP = gql`
 
 export const CONFIGURAR_BACKUP_AUTO = gql`
   mutation ConfigurarBackupAutomatico($input: ConfigBackupAutoInput!) {
-    configurarBackupAutomatico(input: $input) {
-      id tipo formato frecuencia_horas activo ultima_ejecucion
-    }
+    configurarBackupAutomatico(input: $input) { id tipo formato frecuencia_horas activo ultima_ejecucion }
   }
 `;

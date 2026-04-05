@@ -10,6 +10,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { GET_PSICOLOGOS, AGENDAR_CITA } from '../../graphql/operations';
 import { PageHeader, Card, Button, Modal, Field, Input, Alert, EmptyState, Spinner, Badge, Pagination, usePagination } from '../../components/UI';
 import { Colors } from '../../constants/colors';
+import { MenuButton } from '../../components/Drawer';
 
 const DIAS_ES: Record<string, string> = {
   lunes:'Lunes', martes:'Martes', miercoles:'Miercoles',
@@ -66,6 +67,7 @@ export default function Psicologos() {
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.scroll}>
+        <MenuButton />
         <PageHeader title="Psicologos" subtitle={`${total} profesional${total !== 1 ? "es" : ""} disponible${total !== 1 ? "s" : ""}`} />
 
         {/* Search */}

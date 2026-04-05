@@ -33,7 +33,8 @@ import { BackupModule }           from './backup/backup.module';
 import { runSeed }                from './seed/seed';
 
 async function initDatabase(cfg: ConfigService): Promise<void> {
-  const isProd = cfg.get('NODE_ENV') === 'production';
+  const isProd    = cfg.get('NODE_ENV') === 'production';
+  const trustCert = cfg.get('DB_TRUST_CERT', 'true') === 'true';
 
   // Conexión sin base de datos para crear unimente si no existe
   const pool = await mssql.connect({
@@ -43,8 +44,8 @@ async function initDatabase(cfg: ConfigService): Promise<void> {
     password: cfg.get('DB_PASSWORD', ''),
     database: 'master',
     options: {
-      trustServerCertificate: !isProd,  // A02: solo false en producción (certificado real)
-      encrypt: isProd,
+      trustServerCertificate: trustCert,  // Controlado por DB_TRUST_CERT en .env
+      encrypt: !trustCert,
       enableArithAbort: true,
     },
     pool: { max: 1, min: 1 },
@@ -94,7 +95,8 @@ async function initDatabase(cfg: ConfigService): Promise<void> {
       inject:     [ConfigService],
       useFactory: async (cfg: ConfigService) => {
         await initDatabase(cfg);
-        const isProd = cfg.get('NODE_ENV') === 'production';
+        const isProd    = cfg.get('NODE_ENV') === 'production';
+        const trustCert = cfg.get('DB_TRUST_CERT', 'true') === 'true';
         return {
           type:     'mssql',
           host:     cfg.get('DB_HOST',     'localhost'),
@@ -103,7 +105,7 @@ async function initDatabase(cfg: ConfigService): Promise<void> {
           password: cfg.get('DB_PASSWORD', ''),
           database: cfg.get('DB_NAME',     'unimente'),
           // A02: encrypt=true en producción (TLS obligatorio)
-          options:  { trustServerCertificate: !isProd, encrypt: isProd, enableArithAbort: true },
+          options:  { trustServerCertificate: trustCert, encrypt: !trustCert, enableArithAbort: true },
           synchronize:      false,   // A05: NUNCA true en producción
           autoLoadEntities: true,
           requestTimeout:   30_000,

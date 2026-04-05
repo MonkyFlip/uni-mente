@@ -4,7 +4,7 @@ import {
   Database, Settings, Clock,
   FileText, FileJson, FileSpreadsheet, File,
   Layers, GitBranch, GitCommit,
-  CheckCircle2, AlertTriangle, ShieldCheck,
+  CheckCircle2, AlertTriangle, ShieldCheck, Download,
 } from 'lucide-react';
 import { Layout } from '../../components/Layout';
 import { PageHeader, Card, Button, Alert, Field, Badge, Modal } from '../../components/UI';
@@ -138,6 +138,30 @@ export default function Backup() {
     }}});
   };
 
+
+  // ── Descarga de backup ────────────────────────────────────
+  const handleDownload = (b: any) => {
+    const graphqlUrl = (import.meta as any).env?.VITE_GRAPHQL_URL as string
+      || 'http://localhost:3000/graphql';
+    const apiBase = graphqlUrl.replace('/graphql', '');
+    const token   = localStorage.getItem('token') ?? '';
+    const url     = `${apiBase}/api/backup-download/${encodeURIComponent(b.nombre_archivo)}`;
+
+    fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+      .then(res => {
+        if (!res.ok) throw new Error('Error al descargar');
+        return res.blob();
+      })
+      .then(blob => {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = b.nombre_archivo;
+        a.click();
+        URL.revokeObjectURL(a.href);
+      })
+      .catch(() => ok('Error al descargar el archivo.'));
+  };
+
   return (
     <Layout>
       <PageHeader title="Respaldos" subtitle="Gestiona los respaldos de la base de datos" />
@@ -225,13 +249,21 @@ export default function Backup() {
                     </div>
                     <div className={styles.backupDate}>{fmtDate(b.created_at)}</div>
                   </div>
-                  <Button
-                    variant="secondary" size="sm"
-
-                    onClick={() => { setRestoreTarget(b); setRestoreMfa(''); }}
-                  >
-                    Restaurar
-                  </Button>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <Button
+                      variant="secondary" size="sm"
+                      onClick={() => handleDownload(b)}
+                      title="Descargar respaldo"
+                    >
+                      <Download size={13} />
+                    </Button>
+                    <Button
+                      variant="secondary" size="sm"
+                      onClick={() => { setRestoreTarget(b); setRestoreMfa(''); }}
+                    >
+                      Restaurar
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>

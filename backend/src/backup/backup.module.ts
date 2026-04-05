@@ -6,10 +6,11 @@ import { BackupConfig } from './entities/backup-config.entity';
 import { BackupService } from './backup.service';
 import { BackupResolver } from './backup.resolver';
 import { EmergencyRestoreController } from './emergency-restore.controller';
+import { BackupDownloadController } from './backup-download.controller';
 import { MfaModule } from '../mfa/mfa.module';
 @Module({
   imports: [ConfigModule, TypeOrmModule.forFeature([BackupLog, BackupConfig]), MfaModule],
-  controllers: [EmergencyRestoreController],
+  controllers: [EmergencyRestoreController, BackupDownloadController],
   providers: [BackupService, BackupResolver],
   exports: [BackupService],
 })

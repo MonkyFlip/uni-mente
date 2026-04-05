@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { API_BASE_URL } from '../../apollo/client';
 import { useQuery, useMutation } from '@apollo/client';
 import {
   Database, Settings, Clock,
@@ -141,11 +142,8 @@ export default function Backup() {
 
   // ── Descarga de backup ────────────────────────────────────
   const handleDownload = (b: any) => {
-    const graphqlUrl = (import.meta as any).env?.VITE_GRAPHQL_URL as string
-      || 'http://localhost:3000/graphql';
-    const apiBase = graphqlUrl.replace('/graphql', '');
-    const token   = localStorage.getItem('token') ?? '';
-    const url     = `${apiBase}/api/backup-download/${encodeURIComponent(b.nombre_archivo)}`;
+    const token = localStorage.getItem('token') ?? '';
+    const url   = `${API_BASE_URL}/api/backup-download/${encodeURIComponent(b.nombre_archivo)}`;
 
     fetch(url, { headers: { Authorization: `Bearer ${token}` } })
       .then(res => {

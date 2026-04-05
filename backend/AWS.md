@@ -4,13 +4,12 @@
 
 | Parámetro | Valor |
 |---|---|
+| Nombre | UniMente |
 | Instancia | c7i-flex.large |
-| vCPU | 2 |
-| RAM | 4 GB |
+| vCPU / RAM | 2 vCPU / 4 GB |
 | SO | Amazon Linux 2023 (AMI ami-02f986bab3de34d0d) |
 | Almacenamiento | 30 GiB gp3 |
 | Security Group | unimente-security |
-| IP pública | 18.190.217.141 |
 | Par de claves | unimente-key |
 
 ---
@@ -19,23 +18,44 @@
 
 | Tipo | Puerto | Origen | Propósito |
 |---|---|---|---|
-| SSH | 22 | Tu IP | Acceso inicial de configuración |
-| TCP personalizado | 3000 | 0.0.0.0/0 | API backend (frontend Amplify → EC2) |
+| SSH | 22 | Tu IP | Acceso de administración |
+| TCP | 80 | 0.0.0.0/0 | HTTP → redirige a HTTPS |
+| TCP | 443 | 0.0.0.0/0 | HTTPS nginx → NestJS |
 
-> **Puerto 1433 (SQL Server) NO debe estar expuesto.** Solo se comunica internamente entre contenedores Docker.
+> **Puerto 1433 (SQL Server) y 3000 (NestJS) NO expuestos.** Solo accesibles dentro de la red Docker interna.
 
 ---
 
-## Configuración inicial de la EC2 (solo una vez)
+## Arquitectura de contenedores
 
-Conectarse vía SSH:
-```bash
-ssh -i unimente-key.pem ec2-user@18.190.217.141
+```
+Internet (HTTPS :443)
+        │
+   unimente-nginx          (nginx:1.27-alpine)
+   SSL termination         Redirige HTTP→HTTPS
+   CORS handler            Reverse proxy a NestJS
+        │
+   unimente-backend        (node:20.14-alpine, multi-stage)
+   NestJS + Apollo GraphQL Puerto interno 3000
+        │
+   unimente-sqlserver      (mssql/server:2022-CU13)
+   SQL Server 2022         Puerto interno 1433
+   Volumen: unimente_sqlserver_data
 ```
 
+El tráfico público nunca llega directamente a NestJS ni a SQL Server — siempre pasa por nginx.
+
 ---
 
-### 1. Instalar Docker y Docker Compose
+## Configuración inicial (solo una vez)
+
+### 1. Conectarse por SSH
+
+```bash
+ssh -i unimente-key.pem ec2-user@<IP_PUBLICA>
+```
+
+### 2. Instalar Docker y Docker Compose
 
 ```bash
 sudo dnf update -y
@@ -58,86 +78,68 @@ docker compose version
 > Cierra la sesión y vuelve a entrar para que el grupo `docker` aplique:
 > ```bash
 > exit
-> ssh -i unimente-key.pem ec2-user@18.190.217.141
+> ssh -i unimente-key.pem ec2-user@<IP_PUBLICA>
 > ```
 
----
-
-### 2. Clonar solo la carpeta backend (sparse checkout)
-
-Git permite clonar únicamente un subdirectorio del repositorio sin descargar todo el proyecto. Esto mantiene la EC2 limpia y reduce el tiempo de clonado.
+### 3. Clonar solo la carpeta backend (sparse checkout)
 
 ```bash
 cd ~
-
-# Inicializar repo vacío
 git init unimente-backend
 cd unimente-backend
-
-# Conectar con el repositorio remoto
 git remote add origin https://github.com/MonkyFlip/uni-mente.git
-
-# Activar sparse checkout (solo descarga lo que indiques)
 git sparse-checkout init --cone
-
-# Especificar que solo quieres la carpeta backend
 git sparse-checkout set backend
-
-# Descargar la rama aws
 git pull origin aws
+cd backend
 ```
 
-Resultado: solo tendrás la carpeta `backend/` en `~/unimente-backend/backend/`.
-
-Navegar al directorio de trabajo:
-```bash
-cd ~/unimente-backend/backend
-ls
-# Dockerfile  docker-compose.yml  src/  .env.example  ...
-```
-
----
-
-### 3. Configurar variables de entorno
+### 4. Configurar variables de entorno
 
 ```bash
 cp .env.example .env
 nano .env
 ```
 
-Editar los valores críticos:
+Valores críticos a cambiar:
 
 ```env
 DB_PASSWORD=TuPasswordSegura2026!
-JWT_SECRET=<genera con el comando de abajo>
+JWT_SECRET=<genera: node -e "console.log(require('crypto').randomBytes(48).toString('hex'))">
 RESTORE_SECRET=TuClaveDeEmergenciaSegura!
 ALLOWED_ORIGINS=https://aws.d1mrcwf1ifucba.amplifyapp.com,http://localhost:5173
 NODE_ENV=production
 ```
 
-Generar JWT_SECRET seguro:
+Guardar: `Ctrl+O` → `Enter` → `Ctrl+X`
+
+### 5. Generar certificado SSL autofirmado
+
 ```bash
-node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+cd nginx
+chmod +x gen-cert.sh
+./gen-cert.sh
+cd ..
 ```
 
-Guardar: `Ctrl+O`, `Enter`, `Ctrl+X`
+Verifica que se creó:
 
----
+```bash
+ls nginx/certs/
+# server.crt  server.key
+```
 
-### 4. Configurar auto-inicio con systemd
-
-El servicio systemd ejecuta `docker compose up -d` automáticamente cada vez que la EC2 se encienda. No requiere intervención manual.
+### 6. Configurar auto-inicio con systemd
 
 ```bash
 sudo nano /etc/systemd/system/unimente.service
 ```
 
-Pegar exactamente esto:
+Pegar exactamente:
 
 ```ini
 [Unit]
-Description=UniMente — Docker Compose (SQL Server + NestJS)
-Documentation=https://github.com/MonkyFlip/uni-mente
+Description=UniMente — Docker Compose (SQL Server + NestJS + Nginx)
 Requires=docker.service
 After=docker.service network-online.target
 Wants=network-online.target
@@ -149,7 +151,6 @@ User=ec2-user
 WorkingDirectory=/home/ec2-user/unimente-backend/backend
 ExecStart=/usr/bin/docker compose up -d --remove-orphans
 ExecStop=/usr/bin/docker compose down --remove-orphans
-ExecReload=/usr/bin/docker compose restart
 TimeoutStartSec=300
 TimeoutStopSec=120
 Restart=on-failure
@@ -166,42 +167,95 @@ sudo systemctl daemon-reload
 sudo systemctl enable unimente.service
 ```
 
----
-
-### 5. Primera construcción e inicio
+### 7. Primera construcción e inicio
 
 ```bash
-cd ~/unimente-backend/backend
 docker compose up --build -d
-```
-
-Monitorear el arranque (SQL Server tarda ~60 s la primera vez):
-
-```bash
 docker compose logs -f
 ```
 
-El sistema está listo cuando aparezca:
+Esperar hasta ver:
 ```
 UniMente Backend corriendo en http://localhost:3000/graphql
 ```
 
-Verificar que el seed corrió:
+SQL Server tarda ~60 s en iniciar la primera vez. El backend espera automáticamente.
+
+### 8. Verificar que el sistema funciona
+
 ```bash
-docker compose logs backend | grep -E "Seed|psicolog|Admins"
+# Verificar contenedores
+docker ps
+
+# Verificar GraphQL vía nginx SSL
+curl -sk https://localhost/graphql \
+  -H "Content-Type: application/json" \
+  -d '{"query":"{ __typename }"}' \
+  -w "\nHTTP: %{http_code}\n"
+# Debe devolver HTTP: 200
+
+# Verificar CORS desde Amplify
+curl -sk -X OPTIONS https://localhost/graphql \
+  -H "Origin: https://aws.d1mrcwf1ifucba.amplifyapp.com" \
+  -H "Access-Control-Request-Method: POST" \
+  -I | grep -i "access-control"
+```
+
+### 9. Verificar seed de datos
+
+```bash
+docker compose logs backend | grep -E "Seed|psicolog|Admins|omitido"
 ```
 
 ---
 
-### 6. Verificar funcionamiento
+## IP dinámica — acción requerida tras encender la EC2
+
+La IP pública cambia cada vez que la instancia se apaga y vuelve a encender.
+
+**Después de encender la EC2:**
+
+1. Ve a la consola AWS → EC2 → Instancias → selecciona `UniMente`
+2. Copia la nueva **Dirección IPv4 pública**
+3. Actualiza `frontend/src/apollo/client.ts`:
+   ```typescript
+   uri: 'https://<NUEVA_IP>/graphql'
+   ```
+4. Commit y push a la rama `aws` → Amplify redespliega automáticamente en ~2 min
+
+> **Solución permanente:** asigna una **Elastic IP** en la consola AWS (gratis mientras la instancia esté encendida, cobra ~$0.005/hr cuando está apagada).
+
+---
+
+## Aplicar nuevos cambios del repositorio
+
+Cuando hagas cambios en local y los subas a la rama `aws`:
 
 ```bash
-curl -X POST http://18.190.217.141:3000/graphql \
-  -H "Content-Type: application/json" \
-  -d '{"query":"{ __typename }"}' \
-  -o /dev/null -w "%{http_code}\n"
-# Debe devolver: 200
+ssh -i unimente-key.pem ec2-user@<IP_PUBLICA>
+cd ~/unimente-backend
+
+# Descargar cambios
+git pull origin aws
+
+cd backend
+
+# Si solo cambiaron archivos de frontend o config (no código backend):
+docker compose up -d
+
+# Si cambió código del backend (src/, package.json, Dockerfile):
+docker compose up --build -d backend
+
+# Si cambió nginx.conf:
+docker compose exec nginx nginx -t        # verificar sintaxis
+docker compose exec nginx nginx -s reload # recargar sin cortar tráfico
+
+# Si cambió docker-compose.yml:
+docker compose down
+docker compose up -d
 ```
+
+Los datos de SQL Server **nunca se borran** al rebuildar — están en el volumen `unimente_sqlserver_data` que persiste independientemente.
 
 ---
 
@@ -211,93 +265,68 @@ curl -X POST http://18.190.217.141:3000/graphql \
 
 ```
 EC2 se enciende
-  └─ systemd inicia docker.service
-       └─ systemd inicia unimente.service
+  └─ systemd: docker.service
+       └─ systemd: unimente.service
             └─ docker compose up -d
-                 ├─ unimente-sqlserver arranca
-                 │    └─ healthcheck pasa (~60-90 s)
-                 └─ unimente-backend arranca (~15 s)
+                 ├─ unimente-sqlserver arranca (~60 s, healthcheck)
+                 ├─ unimente-backend arranca (espera healthcheck de db)
+                 │    └─ NestJS inicializa BD + verifica seed
+                 └─ unimente-nginx arranca
                       └─ Sistema listo ✓
 ```
 
-Tiempo total desde encendido hasta operativo: **~2-4 minutos**.
+Tiempo total desde encendido hasta operativo: **~3-5 minutos**
 
 ### Apagar sin perder datos
 
-Desde la consola AWS: **Stop instance** (no Terminate).  
-Los volúmenes EBS persisten. Los datos de SQL Server no se pierden.
+Desde la consola AWS: **Stop instance** (no Terminate). Los volúmenes EBS persisten.
 
 ---
 
-## Actualizar el código
+## Operación diaria
 
 ```bash
-ssh -i unimente-key.pem ec2-user@18.190.217.141
-cd ~/unimente-backend
-
-# Descargar cambios (solo la carpeta backend de la rama aws)
-git pull origin aws
-
-cd backend
-docker compose up --build -d
-```
-
-Los datos de SQL Server **no se borran** al rebuildar la imagen.
-
----
-
-## Comandos de operación frecuentes
-
-```bash
-# Estado de contenedores
+# Ver estado
 docker ps
 
 # Logs en tiempo real
 docker compose logs -f
+docker compose logs -f backend   # solo backend
+docker compose logs -f nginx     # solo nginx
 
-# Solo backend / solo base de datos
-docker compose logs -f backend
-docker compose logs -f db
-
-# Reiniciar solo el backend
+# Reiniciar un solo servicio
 docker compose restart backend
+docker compose restart nginx
 
-# Detener todo sin borrar datos
+# Detener todo (sin borrar datos)
 docker compose down
 
-# Reset total (BORRA TODOS LOS DATOS)
+# RESET TOTAL — borra todos los datos
 docker compose down -v
 ```
 
 ---
 
-## Arquitectura en producción
+## Troubleshooting frecuente
 
-```
-Internet
-  │
-  ├─ Frontend ─ AWS Amplify
-  │    https://aws.d1mrcwf1ifucba.amplifyapp.com
-  │              │  HTTP :3000/graphql
-  │              ▼
-  └─ EC2 c7i-flex.large — 18.190.217.141
-       Puerto 3000 abierto en Security Group
-       │
-       ├─ [Docker] unimente-backend   (NestJS · 512-768 MB)
-       │    Puerto 3000 → público
-       │    Red interna → db:1433
-       │
-       └─ [Docker] unimente-sqlserver (SQL Server 2022 · 2.4 GB)
-            Puerto 1433 → solo red interna
-            Volumen EBS → unimente_sqlserver_data (persiste)
-```
+| Síntoma | Causa | Solución |
+|---|---|---|
+| Backend `unhealthy` pero corriendo | Healthcheck tardó más del start_period | `docker compose up -d` (reintenta) |
+| Nginx `cannot load certificate` | Certs en ruta incorrecta | `ls nginx/certs/` y mover si es necesario |
+| CORS `multiple values` | NestJS + Apollo duplicaban header | nginx usa `proxy_hide_header` y pone el header una vez |
+| `SEED_* no configurada` | Variable faltante en .env | Agregar al .env y `docker compose up -d --force-recreate backend` |
+| `self-signed certificate` | `DB_TRUST_CERT` no está en `true` | Verificar `.env` y recrear el backend |
+| `git pull` rechazado | Cambios locales en EC2 | `git stash && git pull origin aws && git stash drop` |
 
 ---
 
-## Credenciales de acceso
+## Credenciales del sistema (seed)
 
-| Rol | Correo | Contraseña |
+| Rol | Correo | Variable en .env |
 |---|---|---|
-| Administrador | admin@unimente.edu | `SEED_ADMIN_PASSWORD` del .env |
-| Psicólogos | psicologo1..12@unimente.edu | `SEED_DEFAULT_PASSWORD` del .env |
-| Estudiantes | estudiante1..100@unimente.edu | `SEED_DEFAULT_PASSWORD` del .env |
+| Administrador principal | admin@unimente.edu | `SEED_ADMIN_PASSWORD` |
+| Admin Brenda | brendaAdmin@unimente.com | `SEED_ADMIN_BRENDA_PASSWORD` |
+| Admin Abril | abrilAdmin@unimente.com | `SEED_ADMIN_ABRIL_PASSWORD` |
+| Admin Mai | maiAdmin@unimente.com | `SEED_ADMIN_MAI_PASSWORD` |
+| Psicólogos 1-12 | psicologo1..12@unimente.edu | `SEED_DEFAULT_PASSWORD` |
+| Estudiantes 1-100 | estudiante1..100@unimente.edu | `SEED_DEFAULT_PASSWORD` |

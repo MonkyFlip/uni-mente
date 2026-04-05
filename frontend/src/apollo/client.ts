@@ -2,8 +2,11 @@ import { ApolloClient, InMemoryCache, createHttpLink, from } from '@apollo/clien
 import { setContext } from '@apollo/client/link/context';
 import { onError } from '@apollo/client/link/error';
 
+export const GRAPHQL_URL  = 'https://18.190.217.141/graphql';
+export const API_BASE_URL = 'https://18.190.217.141';
+
 const httpLink = createHttpLink({
-  uri: 'https://18.190.217.141/graphql'  // sin :3000, nginx escucha en 443
+  uri: GRAPHQL_URL,
 });
 
 const authLink = setContext((_, { headers }) => {

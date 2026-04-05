@@ -1,105 +1,82 @@
 # UniMente — Backend
 
-API GraphQL del Portal de Bienestar Universitario.  
+API GraphQL del Portal de Bienestar Universitario.
 Stack: **NestJS v11 · TypeORM · SQL Server 2022 · Apollo GraphQL v4 · Passport JWT · @nestjs/schedule**
 
 ---
 
 ## Índice
 
-1. [Requisitos](#1-requisitos)
-2. [Inicio rápido con Docker](#2-inicio-rápido-con-docker)
-3. [Variables de entorno](#3-variables-de-entorno)
-4. [Base de datos](#4-base-de-datos)
-5. [Seed de datos de prueba](#5-seed-de-datos-de-prueba)
-6. [Estructura del proyecto](#6-estructura-del-proyecto)
-7. [Módulos y entidades](#7-módulos-y-entidades)
-8. [Autenticación y roles](#8-autenticación-y-roles)
-9. [MFA — Autenticación de dos factores](#9-mfa--autenticación-de-dos-factores)
-10. [Sistema de respaldos](#10-sistema-de-respaldos)
-11. [Restauración de emergencia](#11-restauración-de-emergencia)
-12. [API GraphQL — Referencia de operaciones](#12-api-graphql--referencia-de-operaciones)
-13. [Despliegue en AWS EC2](#13-despliegue-en-aws-ec2)
+1. [Inicio rápido con Docker](#1-inicio-rápido-con-docker)
+2. [Variables de entorno](#2-variables-de-entorno)
+3. [Base de datos — inicialización automática](#3-base-de-datos--inicialización-automática)
+4. [Seed de datos de prueba](#4-seed-de-datos-de-prueba)
+5. [Estructura del proyecto](#5-estructura-del-proyecto)
+6. [Módulos y entidades](#6-módulos-y-entidades)
+7. [Autenticación y roles](#7-autenticación-y-roles)
+8. [MFA — Autenticación de dos factores](#8-mfa--autenticación-de-dos-factores)
+9. [Sistema de respaldos](#9-sistema-de-respaldos)
+10. [Restauración de emergencia](#10-restauración-de-emergencia)
+11. [API GraphQL — Referencia completa](#11-api-graphql--referencia-completa)
+12. [Despliegue en AWS EC2](#12-despliegue-en-aws-ec2)
+13. [Aplicar nuevos cambios](#13-aplicar-nuevos-cambios)
 14. [Scripts disponibles](#14-scripts-disponibles)
 
 ---
 
-## 1. Requisitos
-
-### Con Docker (recomendado)
-| Herramienta | Versión mínima |
-|---|---|
-| Docker | 24+ |
-| Docker Compose v2 | 2.24+ |
-
-### Sin Docker (desarrollo local)
-| Herramienta | Versión mínima |
-|---|---|
-| Node.js | 20 LTS |
-| npm | 10 |
-| SQL Server | 2022 |
-
----
-
-## 2. Inicio rápido con Docker
+## 1. Inicio rápido con Docker
 
 ```bash
-# 1. Clonar rama aws
+# Clonar rama aws
 git clone -b aws https://github.com/MonkyFlip/uni-mente.git
 cd uni-mente/backend
 
-# 2. Configurar entorno
+# Configurar entorno
 cp .env.example .env
 # Editar .env con tus valores
 
-# 3. Construir e iniciar (primera vez)
+# Construir e iniciar (primera vez)
 docker compose up --build -d
 
-# 4. Ver logs
+# Ver logs
 docker compose logs -f
-
-# Reinicios posteriores (sin reconstruir)
-docker compose up -d
 ```
 
-El sistema estará listo cuando veas:
+El sistema está listo cuando aparece:
 ```
 UniMente Backend corriendo en http://localhost:3000/graphql
 ```
 
-SQL Server tarda ~60 segundos en inicializar la primera vez. El backend espera automáticamente gracias al healthcheck.
+SQL Server tarda ~60 s en iniciar. El backend espera automáticamente el healthcheck.
+
+**Reinicios posteriores** (sin cambios de código):
+```bash
+docker compose up -d
+```
 
 ---
 
-## 3. Variables de entorno
+## 2. Variables de entorno
 
-Crea `.env` a partir de `.env.example`:
+Copia `.env.example` a `.env` y ajusta:
 
-```env
-# Base de datos
-DB_PASSWORD=UniMente_DB_2026!     # min 8 chars, mayus+minus+numero+simbolo
-DB_PORT=1433
-DB_NAME=unimente
-DB_TRUST_CERT=true                # false en produccion con certificado real
-
-# JWT
-JWT_SECRET=<64+ chars aleatorios>
-JWT_EXPIRES=8h
-
-# Emergencia
-RESTORE_SECRET=<clave segura>
-
-# Servidor
-PORT=3000
-NODE_ENV=production
-
-# CORS — lista blanca de origenes permitidos
-ALLOWED_ORIGINS=https://aws.d1mrcwf1ifucba.amplifyapp.com,http://localhost:5173
-
-# Contraseñas del seed (CWE-547)
-SEED_ADMIN_PASSWORD=Admin1234!
-SEED_DEFAULT_PASSWORD=Password123!
-```
+| Variable | Descripción | Requisito |
+|---|---|---|
+| `DB_PASSWORD` | Contraseña SQL Server | min 8 chars, mayus+minus+num+simbolo |
+| `DB_PORT` | Puerto SQL Server | `1433` |
+| `DB_NAME` | Nombre de la BD | `unimente` |
+| `DB_TRUST_CERT` | Confiar en cert autofirmado | `true` en dev/EC2 |
+| `JWT_SECRET` | Clave para firmar tokens | mínimo 32 chars aleatorios |
+| `JWT_EXPIRES` | Duración del token | `8h` recomendado |
+| `RESTORE_SECRET` | Clave de restauración de emergencia | cadena segura |
+| `PORT` | Puerto del servidor NestJS | `3000` |
+| `NODE_ENV` | Entorno | `production` en EC2 |
+| `ALLOWED_ORIGINS` | CORS whitelist | URLs separadas por coma |
+| `SEED_ADMIN_PASSWORD` | Admin principal | min 8 chars |
+| `SEED_ADMIN_BRENDA_PASSWORD` | Admin Brenda | min 8 chars |
+| `SEED_ADMIN_ABRIL_PASSWORD` | Admin Abril | min 8 chars |
+| `SEED_ADMIN_MAI_PASSWORD` | Admin Mai | min 8 chars |
+| `SEED_DEFAULT_PASSWORD` | Psicólogos y estudiantes | min 8 chars |
 
 Generar JWT_SECRET seguro:
 ```bash
@@ -108,24 +85,26 @@ node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
 
 ---
 
-## 4. Base de datos
+## 3. Base de datos — inicialización automática
 
-### Inicialización automática
+Al arrancar por primera vez, `app.module.ts` ejecuta `initDatabase()`:
 
-Al arrancar por primera vez, el backend:
-
-1. Conecta a SQL Server en `master`
-2. Ejecuta `src/database/init.sql` — crea la BD `unimente` y todas las tablas
-3. Si `Psicologo` está vacía → corre el seed automáticamente
-4. TypeORM conecta a `unimente` y NestJS arranca
+1. Conecta a SQL Server en la BD `master`
+2. Ejecuta `src/database/init.sql` — crea la BD `unimente` y todas las tablas con `IF NOT EXISTS`
+3. Aplica migraciones seguras de columnas MFA si no existen
+4. Si la tabla `Psicologo` está vacía → ejecuta el seed automáticamente
+5. TypeORM conecta a `unimente` con `synchronize: false`
+6. NestJS arranca
 
 **No es necesario ejecutar ningún SQL manualmente.**
+
+La conexión a SQL Server usa `DB_TRUST_CERT` del `.env` para controlar `trustServerCertificate`. En entornos con certificado autofirmado (dev, EC2 con nginx autofirmado) debe ser `true`.
 
 ### Esquema de tablas
 
 ```
 Rol
-└── Usuario (id_rol FK)           ← mfa_secret, mfa_enabled, activo
+└── Usuario (id_rol FK, activo BIT)    ← soft delete, mfa_secret, mfa_enabled
       ├── Estudiante (id_usuario FK)
       │     └── Cita (id_estudiante FK, id_psicologo FK)
       │           └── Sesion (id_cita FK, UNIQUE)
@@ -134,115 +113,126 @@ Rol
             └── Historial_Clinico (id_estudiante FK, id_psicologo FK)
                   └── Detalle_Historial (id_historial FK, id_sesion FK)
 
-Backup_Log     ← registro de cada backup realizado
-Backup_Config  ← configuración del backup automático
+Backup_Log     ← registro de cada backup (tipo, formato, tamaño, modo)
+Backup_Config  ← configuración del scheduler automático
 ```
 
 ---
 
-## 5. Seed de datos de prueba
+## 4. Seed de datos de prueba
 
-### Registros generados (~2 000+)
+### Volumen generado (~2 350 registros)
 
 | Tabla | Registros |
 |---|---|
+| Roles | 3 (administrador, psicologo, estudiante) |
 | Admins | 4 |
 | Psicólogos | 12 (+ 12 usuarios) |
 | Horarios | ~48 |
 | Estudiantes | 100 (+ 100 usuarios) |
-| Citas | ~1 400 (58% ASISTIDA, 15% CANCELADA, 27% PENDIENTE) |
+| Citas | ~1 400 (58% ASISTIDA · 15% CANCELADA · 27% PENDIENTE) |
 | Sesiones clínicas | ~700 |
 | Historiales clínicos | ~280 |
-| Detalles historial | ~700 |
-| **Total** | **~2 350** |
+| Detalles de historial | ~700 |
 
 ### Credenciales
 
 | Rol | Correo | Contraseña |
 |---|---|---|
 | Administrador | admin@unimente.edu | `SEED_ADMIN_PASSWORD` del .env |
-| Psicólogos | psicologo1..12@unimente.edu | `SEED_DEFAULT_PASSWORD` del .env |
-| Estudiantes | estudiante1..100@unimente.edu | `SEED_DEFAULT_PASSWORD` del .env |
+| Admin Brenda | brendaAdmin@unimente.com | `SEED_ADMIN_BRENDA_PASSWORD` |
+| Admin Abril | abrilAdmin@unimente.com | `SEED_ADMIN_ABRIL_PASSWORD` |
+| Admin Mai | maiAdmin@unimente.com | `SEED_ADMIN_MAI_PASSWORD` |
+| Psicólogos | psicologo1..12@unimente.edu | `SEED_DEFAULT_PASSWORD` |
+| Estudiantes | estudiante1..100@unimente.edu | `SEED_DEFAULT_PASSWORD` |
 
-### Re-ejecutar seed (borra y recrea todo)
-
-```bash
-# Dentro del contenedor
-docker compose exec backend npx ts-node -r tsconfig-paths/register src/seed/seed.ts
-
-# O desde la terminal de la EC2
-docker exec -it unimente-backend npx ts-node -r tsconfig-paths/register src/seed/seed.ts
-```
+> Todas las contraseñas del seed deben tener mínimo 8 caracteres. El validador lo exige en `NODE_ENV=production`.
 
 ---
 
-## 6. Estructura del proyecto
+## 5. Estructura del proyecto
 
 ```
 backend/
 ├── src/
-│   ├── app.module.ts              # Módulo raíz — init BD, seed, ScheduleModule
-│   ├── main.ts                    # Bootstrap + helmet + CORS + throttler
+│   ├── app.module.ts              # Módulo raíz — init BD, seed, TypeORM, GraphQL
+│   ├── main.ts                    # Bootstrap — helmet, CORS, throttler, ValidationPipe
 │   │
 │   ├── database/
-│   │   └── init.sql               # CREATE IF NOT EXISTS + migración MFA + Backup
+│   │   └── init.sql               # CREATE IF NOT EXISTS — todas las tablas
 │   │
 │   ├── seed/
 │   │   └── seed.ts                # ~2 350 registros de prueba
 │   │
-│   ├── auth/                      # JWT login
+│   ├── auth/                      # Login JWT + estrategia Passport
 │   ├── common/
 │   │   ├── decorators/            # @CurrentUser, @Roles
 │   │   ├── enums/                 # EstadoCita, RolNombre
+│   │   ├── filters/               # HttpExceptionFilter
 │   │   └── guards/                # JwtAuthGuard, RolesGuard, ThrottlerGuard
 │   │
-│   ├── mfa/                       # TOTP con speakeasy + qrcode
-│   ├── backup/                    # Respaldos SQL/JSON/CSV/Excel + scheduler
-│   │   └── emergency-restore.controller.ts
+│   ├── mfa/                       # TOTP (speakeasy + qrcode)
+│   │
+│   ├── backup/
+│   │   ├── backup.service.ts      # Lógica de backups SQL/JSON/CSV/Excel
+│   │   ├── backup.resolver.ts     # Mutations y queries GraphQL de backups
+│   │   ├── backup.module.ts       # Registro de controllers y providers
+│   │   ├── backup-download.controller.ts   # GET /api/backup-download/:filename
+│   │   ├── emergency-restore.controller.ts # GET /api/emergency-backups
+│   │   │                                   # POST /api/emergency-restore
+│   │   └── entities/
+│   │       ├── backup-log.entity.ts
+│   │       └── backup-config.entity.ts
 │   │
 │   ├── usuario/
 │   ├── estudiante/
 │   ├── psicologo/
 │   ├── horario-psicologo/
-│   ├── cita/                      # misCitas + miAgenda (JWT-resolved)
+│   ├── cita/                      # misCitas + miAgenda (JWT-resolved, sin ID)
 │   ├── sesion/
 │   ├── historial-clinico/
 │   └── detalle-historial/
 │
-├── Dockerfile                     # Multi-stage build (builder + runtime)
-├── docker-compose.yml             # SQL Server + NestJS con healthcheck
-├── .env.example                   # Plantilla de variables de entorno
+├── nginx/
+│   ├── nginx.conf                 # Reverse proxy SSL + CORS handler
+│   ├── gen-cert.sh                # Genera certificado autofirmado (1 vez)
+│   └── certs/                     # server.crt + server.key (no en Git)
+│
+├── Dockerfile                     # Multi-stage build: builder → runtime (node:20.14-alpine)
+├── docker-compose.yml             # db + backend + nginx con healthchecks
+├── .env.example                   # Plantilla de variables
+├── tsconfig.json
 ├── AWS.md                         # Guía de despliegue en EC2
 └── BACKEND.md                     # Este archivo
 ```
 
 ---
 
-## 7. Módulos y entidades
+## 6. Módulos y entidades
 
-### Roles
+### Roles del sistema
 
 | Rol | Descripción |
 |---|---|
-| `administrador` | Gestiona psicólogos, ejecuta backups |
-| `psicologo` | Gestiona horarios, agenda y sesiones clínicas |
-| `estudiante` | Busca psicólogos y agenda citas |
+| `administrador` | Gestiona psicólogos/estudiantes, ejecuta backups, descarga backups |
+| `psicologo` | Gestiona horarios, agenda, registra sesiones clínicas |
+| `estudiante` | Busca psicólogos, agenda citas, ve sus citas |
 
 ### Estados de cita
 
 | Estado | Descripción |
 |---|---|
-| `PENDIENTE` | Cita agendada, aún no ocurrida |
-| `ASISTIDA` | Marcada al registrar una sesión clínica |
-| `CANCELADA` | Cancelada por estudiante o psicólogo |
+| `PENDIENTE` | Agendada, aún no ocurrida |
+| `ASISTIDA` | Registrada al crear una sesión clínica |
+| `CANCELADA` | Cancelada por el estudiante o psicólogo |
 
 ### Soft delete
 
-La columna `activo BIT` en `Usuario` permite deshabilitar cuentas sin borrar historial clínico.
+La columna `activo BIT` en `Usuario` deshabilita cuentas sin borrar el historial clínico. Los resolvers de administrador exponen `toggleActivoPsicologo` y `toggleActivoEstudiante`.
 
 ---
 
-## 8. Autenticación y roles
+## 7. Autenticación y roles
 
 ### Login
 
@@ -253,12 +243,10 @@ mutation Login($correo: String!, $password: String!) {
     rol
     nombre
     correo
-    id_perfil
+    id_perfil      # id_estudiante o id_psicologo según rol; null para admin
   }
 }
 ```
-
-El campo `id_perfil` devuelve `id_estudiante` o `id_psicologo` según el rol. Para `administrador` devuelve `null`.
 
 ### Cabecera de autenticación
 
@@ -266,33 +254,36 @@ El campo `id_perfil` devuelve `id_estudiante` o `id_psicologo` según el rol. Pa
 Authorization: Bearer <access_token>
 ```
 
-### Queries JWT-resolved (sin parámetro de ID)
+### Queries JWT-resolved
+
+Estas queries resuelven automáticamente el perfil desde el JWT — no requieren pasar ID:
 
 ```graphql
-query { misCitas { id_cita fecha estado psicologo { usuario { nombre } } } }
-query { miAgenda { id_cita fecha estado estudiante { usuario { nombre } } } }
+query { misCitas  { id_cita fecha estado psicologo  { usuario { nombre } } } }
+query { miAgenda  { id_cita fecha estado estudiante { usuario { nombre } } } }
 ```
 
 ---
 
-## 9. MFA — Autenticación de dos factores
+## 8. MFA — Autenticación de dos factores
 
 Implementa **TOTP (RFC 6238)**, compatible con Google Authenticator, Microsoft Authenticator y Authy.
 
-### Flujo de activación
+### Flujo
 
 ```
 1. mutation setupMfa
    → devuelve qr_code (PNG base64) y secret (base32)
-   → el usuario escanea el QR
+   → el usuario escanea el QR en su app autenticadora
 
 2. mutation habilitarMfa(input: { codigo: "123456" })
-   → MFA queda ACTIVO
+   → MFA queda ACTIVO en la cuenta
 
-3. A partir de aquí, crearBackup y restaurarBackup requieren codigo_mfa
+3. Operaciones que requieren MFA activo:
+   → crearBackup, restaurarBackup, configurarBackupAutomatico, cambiarPassword
 ```
 
-### Operaciones disponibles
+### Operaciones
 
 | Operación | Requiere |
 |---|---|
@@ -300,17 +291,17 @@ Implementa **TOTP (RFC 6238)**, compatible con Google Authenticator, Microsoft A
 | `habilitarMfa(codigo)` | JWT |
 | `deshabilitarMfa(codigo)` | JWT + código válido |
 | `miEstadoMfa` | JWT |
-| `cambiarPassword(input)` | JWT (+ codigo_mfa si MFA activo) |
+| `cambiarPassword(input)` | JWT (+ `codigo_mfa` si MFA activo) |
 
 ---
 
-## 10. Sistema de respaldos
+## 9. Sistema de respaldos
 
-Solo el rol **administrador** puede ejecutar backups. Todas las operaciones requieren `codigo_mfa` si está activo.
+Solo el rol **administrador** puede crear y restaurar backups. Todas las operaciones requieren `codigo_mfa` si el usuario tiene MFA activo.
 
 Los archivos se guardan en `backend/Backup/` (volumen Docker persistente).
 
-### Tipos de backup
+### Tipos
 
 | Tipo | Contenido |
 |---|---|
@@ -322,108 +313,280 @@ Los archivos se guardan en `backend/Backup/` (volumen Docker persistente).
 
 | Formato | Descripción |
 |---|---|
-| `SQL` | Script ejecutable (`TRUNCATE+INSERT` o `REPLACE INTO`) |
+| `SQL` | Script con `TRUNCATE + INSERT` (COMPLETO) o `INSERT` (otros) |
 | `JSON` | Objeto con metadata + datos por tabla |
 | `CSV` | Secciones por tabla con encabezados |
-| `EXCEL` | `.xlsx` con una hoja por tabla |
+| `EXCEL` | `.xlsx` con una hoja por tabla (ExcelJS) |
 
-### Límite: 3 backups máximo
+### Regla de 3 backups
 
-Cada nuevo backup elimina automáticamente el archivo físico y registro en BD del más antiguo que exceda el límite.
+Cada nuevo backup elimina automáticamente el archivo físico y el registro de BD del más antiguo si se supera el límite de 3.
+
+### Descarga de backups
+
+Los administradores pueden descargar archivos de backup desde la interfaz web.
+
+**Endpoint:** `GET /api/backup-download/:filename`
+
+- Requiere JWT de administrador
+- Protegido contra path traversal (CWE-23): allowlist de caracteres + `resolve()` + `startsWith()`
+- Devuelve el archivo como stream (`application/octet-stream`)
+
+### Backup automático
+
+Configurable desde la UI. Se ejecuta un backup inicial inmediatamente al configurar.
+
+```graphql
+mutation {
+  configurarBackupAutomatico(input: {
+    tipo: "COMPLETO"
+    formato: "SQL"
+    frecuencia_horas: 24
+    codigo_mfa: "123456"
+  }) { tipo formato frecuencia_horas ultima_ejecucion }
+}
+```
 
 ---
 
-## 11. Restauración de emergencia
+## 10. Restauración de emergencia
 
-Endpoint REST accesible **solo cuando la tabla Usuario está vacía** (BD sin datos):
+Accesible **sin JWT**, solo cuando `dbo.Usuario` está vacía (0 registros):
 
-```
-GET  /api/emergency-backups   → lista archivos disponibles en Backup/
-POST /api/emergency-restore   → restaura un backup específico
-```
+| Endpoint | Descripción |
+|---|---|
+| `GET /api/emergency-backups` | Lista archivos `.sql/.json/.csv/.xlsx` en `Backup/` |
+| `POST /api/emergency-restore` | Restaura un backup por nombre de archivo |
 
-Requiere la cabecera `X-Restore-Secret` con el valor de `RESTORE_SECRET` del `.env`.
+Requiere cabecera: `X-Restore-Secret: <valor de RESTORE_SECRET en .env>`
 
 Acceso desde el frontend en `/emergency-restore`.
 
+**Seguridad implementada:**
+- `timingSafeEqual` para comparar el secret (anti timing attack)
+- Allowlist de caracteres en nombre de archivo
+- `resolve() + startsWith()` para directory confinement (CWE-23)
+- Logs con IP del cliente en todos los intentos
+
 ---
 
-## 12. API GraphQL — Referencia de operaciones
+## 11. API GraphQL — Referencia completa
 
 ### Públicas (sin token)
 
 ```graphql
-mutation { login(input: { correo: "", password: "" }) { access_token rol nombre correo id_perfil } }
-mutation { registrarEstudiante(input: $input) { id_estudiante usuario { nombre } } }
+mutation { login(input: { correo: "", password: "" }) {
+  access_token rol nombre correo id_perfil
+}}
+
+mutation { registrarEstudiante(input: $input) {
+  id_estudiante usuario { nombre correo }
+}}
 ```
 
 ### Estudiante
 
 ```graphql
-query  { psicologos { id_psicologo especialidad usuario { nombre } horarios { dia_semana hora_inicio hora_fin } } }
-query  { misCitas { id_cita fecha hora_inicio estado motivo psicologo { usuario { nombre } } } }
-mutation { agendarCita(input: $input) { id_cita fecha estado } }
-mutation { cambiarEstadoCita(id_cita: $id, input: { estado: "CANCELADA" }) { id_cita estado } }
+# Buscar psicólogos disponibles con horarios
+query { psicologos {
+  id_psicologo especialidad cedula usuario { nombre }
+  horarios { dia_semana hora_inicio hora_fin }
+}}
+
+# Mis citas (JWT-resolved, sin pasar ID)
+query { misCitas {
+  id_cita fecha hora_inicio estado motivo
+  psicologo { usuario { nombre } }
+}}
+
+# Agendar
+mutation { agendarCita(input: {
+  id_psicologo: 1  fecha: "2026-05-10"
+  hora_inicio: "10:00"  motivo: "Ansiedad"
+}) { id_cita fecha estado }}
+
+# Cancelar
+mutation { cambiarEstadoCita(id_cita: 1, input: { estado: "CANCELADA" }) {
+  id_cita estado
+}}
 ```
 
 ### Psicólogo
 
 ```graphql
-query  { miAgenda { id_cita fecha hora_inicio estado estudiante { usuario { nombre } matricula } } }
-mutation { crearHorario(input: $input) { id_horario dia_semana hora_inicio hora_fin } }
-mutation { eliminarHorario(id: $id) }
-mutation { cambiarEstadoCita(id_cita: $id, input: $input) { id_cita estado } }
-mutation { registrarSesion(input: $input) { id_sesion numero_sesion notas } }
-query  { expedienteEstudiante(id_estudiante: $id) { id_historial detalles { sesion { notas } } } }
+# Mi agenda (JWT-resolved)
+query { miAgenda {
+  id_cita fecha hora_inicio estado
+  estudiante { usuario { nombre } matricula carrera }
+}}
+
+# Horarios
+mutation { crearHorario(input: {
+  dia_semana: "lunes"  hora_inicio: "09:00"  hora_fin: "10:00"
+}) { id_horario dia_semana hora_inicio hora_fin }}
+mutation { eliminarHorario(id: 1) }
+
+# Marcar cita como asistida / cancelar
+mutation { cambiarEstadoCita(id_cita: 1, input: { estado: "ASISTIDA" }) {
+  id_cita estado
+}}
+
+# Registrar sesión clínica (marca cita como ASISTIDA automáticamente)
+mutation { registrarSesion(input: {
+  id_cita: 1  numero_sesion: 1
+  notas: "El paciente muestra mejoría."
+}) { id_sesion numero_sesion notas }}
+
+# Expediente de paciente
+query { expedienteEstudiante(id_estudiante: 1) {
+  id_historial
+  detalles { sesion { notas numero_sesion } }
+}}
+
+# Mis pacientes
+query { misPacientes {
+  id_estudiante usuario { nombre correo }
+  citas { id_cita fecha estado }
+}}
 ```
 
 ### Administrador
 
 ```graphql
-query  { psicologosAdmin { id_psicologo usuario { nombre correo activo } especialidad cedula } }
-query  { estudiantesAdmin { id_estudiante usuario { nombre correo activo } matricula carrera } }
-mutation { toggleActivoPsicologo(id: $id) { id_psicologo usuario { activo } } }
-mutation { toggleActivoEstudiante(id: $id) { id_estudiante usuario { activo } } }
-mutation { registrarPsicologo(input: $input) { id_psicologo usuario { nombre } } }
-query  { listarBackups { id_backup tipo formato nombre_archivo tamanio_kb created_at } }
-mutation { crearBackup(input: { tipo: "COMPLETO", formato: "SQL", codigo_mfa: "" }) { id_backup } }
-mutation { restaurarBackup(input: { id_backup: 1, codigo_mfa: "" }) }
+# Listados con toggle activo/inactivo
+query { psicologosAdmin {
+  id_psicologo cedula especialidad usuario { nombre correo activo }
+}}
+query { estudiantesAdmin {
+  id_estudiante matricula carrera usuario { nombre correo activo }
+}}
+mutation { toggleActivoPsicologo(id: 1)  { id_psicologo usuario { activo } } }
+mutation { toggleActivoEstudiante(id: 1) { id_estudiante usuario { activo } } }
+
+# Registrar psicólogo
+mutation { registrarPsicologo(input: {
+  nombre: ""  correo: ""  password: ""
+  cedula: ""  especialidad: ""  telefono: ""
+}) { id_psicologo usuario { nombre } }}
+
+# Backups
+query { listarBackups {
+  id_backup tipo formato modo nombre_archivo tamanio_kb created_at
+}}
+mutation { crearBackup(input: {
+  tipo: "COMPLETO"  formato: "SQL"  codigo_mfa: "123456"
+}) { id_backup nombre_archivo tamanio_kb }}
+mutation { restaurarBackup(input: {
+  id_backup: 1  codigo_mfa: "123456"
+}) }
+query { configBackupAutomatico {
+  tipo formato frecuencia_horas ultima_ejecucion
+}}
+mutation { configurarBackupAutomatico(input: {
+  tipo: "COMPLETO"  formato: "SQL"
+  frecuencia_horas: 24  codigo_mfa: "123456"
+}) { tipo formato frecuencia_horas }}
 ```
+
+### Endpoints REST
+
+| Método | Ruta | Auth | Descripción |
+|---|---|---|---|
+| `GET` | `/api/backup-download/:filename` | JWT admin | Descarga archivo de backup |
+| `GET` | `/api/emergency-backups` | Ninguna | Lista backups (BD vacía) |
+| `POST` | `/api/emergency-restore` | `X-Restore-Secret` | Restaura en emergencia |
 
 ---
 
-## 13. Despliegue en AWS EC2
+## 12. Despliegue en AWS EC2
 
-Ver **AWS.md** para la guía completa de configuración, auto-inicio y operación.
+Ver **[AWS.md](./AWS.md)** para la guía completa.
 
-### Resumen de la arquitectura
+### Resumen de la arquitectura en producción
 
 ```
-Amplify (frontend) ──── HTTP/3000 ────► EC2 18.190.217.141
-                                          ├── Docker: unimente-backend (NestJS)
-                                          │     └── Red interna ──► unimente-sqlserver
-                                          └── Docker: unimente-sqlserver
-                                                └── Volumen: unimente_sqlserver_data
+Amplify (frontend HTTPS)
+        │
+        │  POST https://<IP>/graphql
+        ▼
+EC2 c7i-flex.large
+  nginx:443 (SSL termination + CORS handler)
+        │
+  NestJS:3000 (interno)
+        │
+  SQL Server:1433 (interno, volumen EBS)
 ```
 
-El servicio `systemd` **unimente.service** garantiza que Docker Compose arranque automáticamente al encender la EC2.
+### CORS en producción
+
+El CORS lo maneja **nginx**, no NestJS, para evitar que Apollo Server v4 y NestJS dupliquen el header `Access-Control-Allow-Origin`. nginx usa `proxy_hide_header` para quitar los headers del backend y los pone una sola vez con el origen correcto.
+
+### SSL
+
+Certificado autofirmado generado con `nginx/gen-cert.sh`. Los usuarios deben aceptarlo una vez en el navegador visitando `https://<IP>/graphql`.
+
+---
+
+## 13. Aplicar nuevos cambios
+
+### En local → subir al repo
+
+```bash
+git add .
+git commit -m "descripción del cambio"
+git push origin aws
+```
+
+Amplify detecta el push y redespliega el frontend automáticamente en ~2 min.
+
+### En la EC2 → bajar del repo
+
+```bash
+ssh -i unimente-key.pem ec2-user@<IP_PUBLICA>
+cd ~/unimente-backend
+git stash                   # guardar cambios locales si los hay
+git pull origin aws
+git stash drop              # descartar stash (los cambios vinieron del repo)
+cd backend
+```
+
+**Según qué cambió:**
+
+```bash
+# Solo frontend o configuración (no código backend):
+docker compose up -d
+
+# Código backend (src/, package.json, Dockerfile):
+docker compose up --build -d backend
+
+# nginx.conf:
+docker compose exec nginx nginx -t
+docker compose exec nginx nginx -s reload
+
+# docker-compose.yml:
+docker compose down && docker compose up -d
+```
+
+> Los datos de SQL Server **no se borran** al rebuildar. El volumen `unimente_sqlserver_data` persiste siempre.
 
 ---
 
 ## 14. Scripts disponibles
 
 ```bash
-# Desarrollo local
+# Desarrollo local (sin Docker)
 npm run start:dev    # hot-reload
-npm run build        # compilar a dist/
+npm run build        # compilar TypeScript
 
-# Docker
-docker compose up --build -d   # primera vez
-docker compose up -d           # reinicios posteriores
+# Docker — operación diaria
+docker compose up --build -d   # primera vez o tras cambios de código
+docker compose up -d           # reinicios sin cambios
 docker compose down            # detener (sin borrar datos)
-docker compose logs -f         # ver logs en tiempo real
+docker compose logs -f         # logs en tiempo real
+docker compose logs -f backend # solo backend
+docker compose ps              # estado de contenedores
 
-# Seed manual (borra y recrea todos los datos)
+# Seed manual (borra y recrea todos los datos de prueba)
 docker exec -it unimente-backend \
-  npx ts-node -r tsconfig-paths/register src/seed/seed.ts
+  node dist/seed/seed.js
 ```

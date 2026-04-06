@@ -21,6 +21,7 @@ import AdminEstudiantes  from './pages/admin/Estudiantes';
 import Backup            from './pages/admin/Backup';
 import MfaConfig         from './pages/admin/MfaConfig';
 import EmergencyRestore  from './pages/admin/EmergencyRestore';
+import Estadisticas      from './pages/admin/Estadisticas';
 
 export default function App() {
   return (
@@ -55,6 +56,9 @@ export default function App() {
               <Route path="/admin/estudiantes" element={<ProtectedRoute roles={['administrador']}><AdminEstudiantes /></ProtectedRoute>} />
               <Route path="/admin/backup"      element={<ProtectedRoute roles={['administrador']}><Backup /></ProtectedRoute>} />
 
+              {/* Estadísticas (admin y psicólogo) */}
+              <Route path="/admin/estadisticas" element={<ProtectedRoute roles={['administrador']}><Estadisticas /></ProtectedRoute>} />
+              
               {/* Catch-all */}
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>

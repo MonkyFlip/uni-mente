@@ -1,20 +1,33 @@
 .layout {
   display: flex;
   min-height: 100vh;
-}
-.main {
-  margin-left: var(--sidebar-w);
-  flex: 1;
-  min-height: 100vh;
   background: var(--navy);
 }
-.content {
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 36px 32px;
-  animation: fadeIn 0.3s ease;
+
+.main {
+  flex: 1;
+  min-width: 0;
+  overflow-x: hidden;
+  transition: margin-left 0.22s ease;
 }
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: translateY(0); }
+
+.content {
+  padding: 32px;
+  max-width: 1200px;
+}
+
+@media (max-width: 767px) {
+  .layout {
+    /* En móvil el sidebar es fixed, no ocupa espacio en el flujo */
+    display: block;
+  }
+
+  .main {
+    width: 100%;
+    padding-top: 0;
+  }
+
+  .content {
+    padding: 20px 16px;
+  }
 }

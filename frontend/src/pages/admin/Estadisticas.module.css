@@ -1,0 +1,28 @@
+.kpiRow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.chartCard {
+  padding: 20px;
+}
+
+.chartTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--cream);
+  margin: 0 0 16px 0;
+}
+
+@media (max-width: 900px) {
+  .kpiRow { grid-template-columns: 1fr 1fr; }
+  .grid   { grid-template-columns: 1fr; }
+}

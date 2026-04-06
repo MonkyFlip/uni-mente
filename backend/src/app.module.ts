@@ -31,6 +31,7 @@ import { DetalleHistorialModule } from './detalle-historial/detalle-historial.mo
 import { MfaModule }              from './mfa/mfa.module';
 import { BackupModule }           from './backup/backup.module';
 import { runSeed }                from './seed/seed';
+import { EstadisticasModule } from './estadisticas/estadisticas.module';
 
 async function initDatabase(cfg: ConfigService): Promise<void> {
   const isProd    = cfg.get('NODE_ENV') === 'production';
@@ -131,7 +132,8 @@ async function initDatabase(cfg: ConfigService): Promise<void> {
     RolModule, UsuarioModule, AuthModule,
     EstudianteModule, PsicologoModule, HorarioPsicologoModule,
     CitaModule, SesionModule, HistorialClinicoModule, DetalleHistorialModule,
-    MfaModule, BackupModule,
+    MfaModule, BackupModule, EstadisticasModule,
+
   ],
 })
 export class AppModule {}

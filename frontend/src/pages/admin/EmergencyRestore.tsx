@@ -40,7 +40,7 @@ export default function EmergencyRestore() {
   const loadBackups = async () => {
     setLoadingBk(true);
     try {
-      const res  = await fetch('http://localhost:3000/api/emergency-backups');
+      const res  = await fetch('https://unimente.duckdns.org/api/emergency-backups');
       const data = await res.json();
       setBackups(data.backups ?? []);
     } catch { setBackups([]); } finally { setLoadingBk(false); }
@@ -57,7 +57,7 @@ export default function EmergencyRestore() {
       const body: Record<string, any> = selected.id_backup
         ? { id_backup: selected.id_backup }
         : { backup_filename: selected.nombre_archivo };
-      const res  = await fetch('http://localhost:3000/api/emergency-restore', {
+      const res  = await fetch('https://unimente.duckdns.org/api/emergency-restore', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Restore-Secret': secret },
         body: JSON.stringify(body),

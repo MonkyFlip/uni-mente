@@ -7,7 +7,7 @@ import {
 } from 'react-native';
 import {
   LayoutDashboard, Users, GraduationCap, Calendar, Clock,
-  HardDrive, Shield, Palette, HelpCircle, LogOut, X, ChevronRight,
+  HardDrive, Shield, Palette, HelpCircle, LogOut, X, ChevronRight, BookOpen,
 } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext';
@@ -33,6 +33,7 @@ const NAV_ITEMS = {
     { label: 'Inicio',        href: '/(tabs)/dashboard',    Icon: LayoutDashboard },
     { label: 'Mi Agenda',     href: '/(tabs)/agenda',        Icon: Calendar        },
     { label: 'Mis Horarios',  href: '/(tabs)/horarios',      Icon: Clock           },
+    { label: 'Mis Pacientes', href: '/(tabs)/pacientes',     Icon: BookOpen        },
     { label: 'Seguridad MFA', href: '/(tabs)/mfa',           Icon: Shield          },
   ],
   estudiante: [

@@ -154,7 +154,6 @@ export const GET_MIS_PACIENTES = gql`
       usuario { nombre correo }
       citas {
         id_cita fecha hora_inicio estado
-        sesion { id_sesion numero_sesion notas recomendaciones fecha_registro }
       }
     }
   }

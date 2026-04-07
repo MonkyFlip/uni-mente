@@ -7,7 +7,7 @@ import {
 } from 'react-native';
 import {
   LayoutDashboard, Users, GraduationCap, Calendar, Clock,
-  HardDrive, Shield, Palette, HelpCircle, LogOut, X, ChevronRight, BookOpen,
+  HardDrive, Shield, Palette, HelpCircle, LogOut, X, ChevronRight, BookOpen, TrendingUp,
 } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext';
@@ -28,6 +28,7 @@ const NAV_ITEMS = {
     { label: 'Psicólogos',    href: '/(admin)/psicologos',  Icon: Users           },
     { label: 'Respaldos',     href: '/(admin)/backup',       Icon: HardDrive       },
     { label: 'Seguridad MFA', href: '/(admin)/mfa',          Icon: Shield          },
+    { label: 'Estadísticas', href: '/(admin)/estadisticas', Icon: TrendingUp },
   ],
   psicologo: [
     { label: 'Inicio',        href: '/(tabs)/dashboard',    Icon: LayoutDashboard },

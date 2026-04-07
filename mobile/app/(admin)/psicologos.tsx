@@ -19,6 +19,7 @@ import {
   Alert, EmptyState, Spinner, Badge, Pagination, usePagination,
 } from '../../components/UI';
 import { useTheme } from '../../contexts/ThemeContext';
+import { MenuButton } from '../../components/Drawer';
 
 function clean<T extends Record<string, any>>(obj: T): Partial<T> {
   const out: Partial<T> = {};
@@ -105,6 +106,7 @@ export default function AdminPsicologos() {
 
         {/* Header */}
         <View style={s.headerRow}>
+          <MenuButton />
           <PageHeader title="Psicólogos" subtitle={`${total} resultado${total !== 1 ? 's' : ''}`} />
           <Button size="sm" icon={<UserPlus size={15} color={colors.white} />}
             onPress={() => setShowCreate(true)}>

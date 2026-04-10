@@ -24,11 +24,10 @@ export default function Horarios() {
 
   const { data, refetch } = useQuery(GET_PSICOLOGOS, { fetchPolicy: 'network-only' });
 
-  // Find current user's psychologist data
   const psicologo = (data?.psicologos ?? []).find(
     (p: any) => p.id_psicologo === user?.id_perfil
   );
-  const horarios  = psicologo?.horarios ?? [];
+  const horarios = psicologo?.horarios ?? [];
 
   useFocusEffect(useCallback(() => { refetch(); }, []));
 
@@ -48,11 +47,9 @@ export default function Horarios() {
 
   const handleCrear = () => {
     crear({ variables: { input: {
-      id_psicologo: user?.id_perfil,
-      dia_semana:   form.dia_semana,
-      hora_inicio:  form.hora_inicio.length === 5 ? `${form.hora_inicio}:00` : form.hora_inicio,
-      hora_fin:     form.hora_fin.length   === 5 ? `${form.hora_fin}:00`   : form.hora_fin,
-      disponible:   true,
+      dia_semana:  form.dia_semana,
+      hora_inicio: form.hora_inicio.length === 5 ? `${form.hora_inicio}:00` : form.hora_inicio,
+      hora_fin:    form.hora_fin.length    === 5 ? `${form.hora_fin}:00`    : form.hora_fin,
     }}});
   };
 
@@ -71,13 +68,13 @@ export default function Horarios() {
           </Button>
         </View>
 
-        {success && <Alert message={success} type="success" />}
+        {success !== '' && <Alert message={success} type="success" />}
 
         {horarios.length === 0 ? (
           <EmptyState
             icon={<Clock size={28} color={Colors.creamDim} />}
             title="Sin horarios"
-            description="Agrega tu primer horario disponible con el boton de arriba."
+            description="Agrega tu primer horario disponible con el botón de arriba."
           />
         ) : (
           horarios.map((h: any) => (
@@ -108,7 +105,7 @@ export default function Horarios() {
       <Modal open={showAdd} onClose={() => setShowAdd(false)} title="Agregar horario">
         {errCrear && <Alert message={errCrear.message.replace('GraphQL error: ', '')} />}
         <View style={{ gap: 14 }}>
-          <Field label="Dia de la semana">
+          <Field label="Día de la semana">
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <View style={styles.diasRow}>
                 {DIAS.map(d => (
@@ -143,18 +140,18 @@ export default function Horarios() {
 }
 
 const styles = StyleSheet.create({
-  safe:        { flex: 1, backgroundColor: Colors.navy },
-  scroll:      { padding: 20, gap: 12, paddingBottom: 40 },
-  headerRow:   { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
-  horarioCard: { gap: 0 },
-  horarioRow:  { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  horarioIcon: { width: 40, height: 40, borderRadius: 10, backgroundColor: Colors.tealGlow, alignItems: 'center', justifyContent: 'center' },
-  horarioDia:  { fontSize: 14, fontWeight: '600', color: Colors.white },
-  horarioHora: { fontSize: 13, color: Colors.creamDim, marginTop: 2 },
-  deleteBtn:   { padding: 8, borderRadius: 8, backgroundColor: Colors.dangerBg },
-  diasRow:     { flexDirection: 'row', gap: 8 },
-  diaBtn:      { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.navyCard },
-  diaBtnActive:{ borderColor: Colors.teal, backgroundColor: Colors.tealGlow },
-  diaText:     { fontSize: 13, color: Colors.creamDim, fontWeight: '600' },
+  safe:         { flex: 1, backgroundColor: Colors.navy },
+  scroll:       { padding: 20, gap: 12, paddingBottom: 40 },
+  headerRow:    { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
+  horarioCard:  { gap: 0 },
+  horarioRow:   { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  horarioIcon:  { width: 40, height: 40, borderRadius: 10, backgroundColor: Colors.tealGlow, alignItems: 'center', justifyContent: 'center' },
+  horarioDia:   { fontSize: 14, fontWeight: '600', color: Colors.white },
+  horarioHora:  { fontSize: 13, color: Colors.creamDim, marginTop: 2 },
+  deleteBtn:    { padding: 8, borderRadius: 8, backgroundColor: Colors.dangerBg },
+  diasRow:      { flexDirection: 'row', gap: 8 },
+  diaBtn:       { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.navyCard },
+  diaBtnActive: { borderColor: Colors.teal, backgroundColor: Colors.tealGlow },
+  diaText:      { fontSize: 13, color: Colors.creamDim, fontWeight: '600' },
   diaTextActive:{ color: Colors.teal },
 });

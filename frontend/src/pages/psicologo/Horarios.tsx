@@ -25,7 +25,7 @@ export default function Horarios() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    crear({ variables: { input: { id_psicologo: idPsicologo, ...form } } });
+    crear({ variables: { input: { ...form } } });
   };
 
   return (

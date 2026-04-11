@@ -163,7 +163,7 @@ export default function Psicologos() {
   const handleAgendar = (e: React.FormEvent) => {
     e.preventDefault();
     if (!slotH || !fecha) return;
-    agendar({ variables: { input: { id_psicologo: selected!.id_psicologo, fecha, hora_inicio: slotH.hora_inicio, hora_fin: slotH.hora_fin, motivo: motivo.trim() || undefined } } });
+    agendar({ variables: { input: { id_psicologo: selected!.id_psicologo, id_horario: slotH.id_horario, fecha, motivo: motivo.trim() || undefined } } });
   };
 
   const diaTarget = slotH ? getDiaNum(slotH.dia_semana) : 1;
